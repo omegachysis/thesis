@@ -102,6 +102,12 @@ class CellularAutomata(tf.keras.Model):
 		""" Fills the world with random numbers from 0 to the random fill maximum. """
 		x = np.random.rand(self.img_size, self.img_size, self.channel_count).astype(np.float32)
 		return x
+
+	def bordered(self, x, border_value):
+		""" Fills the input state with a border of the given value. """
+		shrunk = x[1:-1, 1:-1, :]
+		padded = np.pad(shrunk, pad_width=1, mode='constant', constant_values=border_value)
+		return padded[:, :, 1:-1]
 			
 	def to_image(self, x, scale=1):
 		# Slice off all the non-color (hidden channels):
@@ -176,38 +182,60 @@ class Training(object):
 		x = x0()[None, ...]
 				
 		xs = []
-		for i in range(lifetime):
-			xs.append(x[0, ..., :3])
-			x = self.ca(x)
 		xs.append(x[0, ..., :3])
-
+		for i in range(lifetime):
+			x = self.ca(x)
+			xs.append(x[0, ..., :3])
+	
 		print("Sample run:")
 		self.ca.display_gif(xs)
 			
 	def show_loss_history(self):
 		if self.loss_hist:
-			print("\n step: %d, log10(loss): %.3f" % (
-				len(self.loss_hist), np.log10(self.loss_hist[-1])), end='')
+			print("\n step: %d, loss: %.3f, log10(loss): %.3f" % (
+				len(self.loss_hist), self.loss_hist[-1], np.log10(self.loss_hist[-1])), end='')
 			plt.plot(self.loss_hist)
 			plt.yscale('log')
 			plt.grid()
 			plt.show()
 	
-	def run(self, x0, xf, lifetime, seconds=5):
+	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None):
+		if self.loss_hist and self.loss_hist[-1] <= 0: return
+
 		initial = result = loss = None
 		start = time.time()
 		elapsed_seconds = 0.0
 
-		while elapsed_seconds < seconds:
+		num_steps = 0
+		while True:
+			if max_steps is not None:
+				if num_steps >= max_steps: 
+					print("Stopping due to max steps reached")
+					return
+			if max_seconds is not None:
+				if elapsed_seconds >= max_seconds: 
+					print("Stopping due to time-out")
+					return
+			if target_loss is not None:
+				if self.loss_hist and self.loss_hist[-1] <= target_loss: 
+					print("Stopping due to target loss reached")
+					return
+					
 			initial = np.repeat(x0()[None, ...], 1, 0)
 			target = np.repeat(xf()[None, ...], 1, 0)
 			x, loss = self.train_step(initial, target, lifetime)
 			self.loss_hist.append(loss.numpy())
-			
 			# Feed the final state back in and train again on that.
 			#x, loss = self.train_step(x, target, lifetime)
-			
 			elapsed_seconds = time.time() - start
+			
+			num_steps += 1
+			if self.loss_hist and self.loss_hist[-1] <= 0: 
+				print("Stopping due to zero loss")
+				return
+
+		else:
+			raise ValueError()
 					
 	def save(self):
 		self.ca.model.save_weights("./checkpoints/data")
