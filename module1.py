@@ -199,12 +199,16 @@ class Training(object):
 			plt.grid()
 			plt.show()
 	
-	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None):
+	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
+		max_plateau_len=None):
 		if self.loss_hist and self.loss_hist[-1] <= 0: return
 
 		initial = result = loss = None
 		start = time.time()
 		elapsed_seconds = 0.0
+
+		best_loss = None
+		plateau = 0
 
 		num_steps = 0
 		while True:
@@ -220,10 +224,20 @@ class Training(object):
 				if self.loss_hist and self.loss_hist[-1] <= target_loss: 
 					print("Stopping due to target loss reached")
 					return
+			if max_plateau_len is not None:
+				if plateau >= max_plateau_len:
+					print("Stopping due to plateau")
+					return
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
 			target = np.repeat(xf()[None, ...], 1, 0)
 			x, loss = self.train_step(initial, target, lifetime)
+			if best_loss is None or loss.numpy() < best_loss:
+				best_loss = loss.numpy()
+				plateau = 0
+			else:
+				plateau += 1
+
 			self.loss_hist.append(loss.numpy())
 			# Feed the final state back in and train again on that.
 			#x, loss = self.train_step(x, target, lifetime)
