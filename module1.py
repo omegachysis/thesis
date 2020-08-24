@@ -26,7 +26,7 @@ class CellularAutomata(tf.keras.Model):
 		self.img_size = img_size
 		self.channel_count = channel_count
 		self.conserve_mass = False
-		self.noise_range = (-0.1, 0.1)
+		self.noise_range = (0.0, 0.0)
 		self.clamp_values = True
 		self.edge_strategy = EdgeStrategy.TF_SAME
 
