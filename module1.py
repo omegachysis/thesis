@@ -16,6 +16,7 @@ class EdgeStrategy:
 	ZEROS = 'pad_const zeros'
 	ONES = 'pad_const ones'
 	MIRROR = 2
+	RANDOM = 3
 
 class CellularAutomata(tf.keras.Model):
 	def __init__(self, img_size: int, 
@@ -84,6 +85,15 @@ class CellularAutomata(tf.keras.Model):
 			pad_mode = "VALID"
 			paddings = tf.constant([[0,0], [1,1], [1,1], [0,0]])
 			x = tf.pad(x, paddings, "SYMMETRIC")
+
+		elif self.edge_strategy == EdgeStrategy.RANDOM:
+			pad_mode = "VALID"
+			paddings = tf.constant([[0,0], [1,1], [1,1], [0,0]])
+			x = tf.pad(x, paddings, "CONSTANT")
+			mask = tf.constant(0.0, shape=(1, self.img_size, self.img_size, self.channel_count))
+			mask = tf.pad(mask, paddings, "CONSTANT", constant_values=1.0)
+			noise = tf.cast(tf.random.uniform(tf.shape(mask[...])), tf.float32)
+			x += mask * noise
 
 		conv = tf.nn.depthwise_conv2d(x, 
 			filter=self.perception_kernel, 
