@@ -10,6 +10,13 @@ import time
 import statistics as stats
 from matplotlib import pyplot as plt
 
+class EdgeStrategy:
+	TF_SAME = 0
+	TORUS = 1
+	ZEROS = 'pad_const zeros'
+	ONES = 'pad_const ones'
+	MIRROR = 2
+
 class CellularAutomata(tf.keras.Model):
 	def __init__(self, img_size: int, 
 	channel_count: int, layer_counts: [int], perception_kernel):
@@ -20,6 +27,7 @@ class CellularAutomata(tf.keras.Model):
 		self.conserve_mass = False
 		self.noise_range = (-0.1, 0.1)
 		self.clamp_values = True
+		self.edge_strategy = EdgeStrategy.TF_SAME
 
 		perception_input = tf.keras.layers.Input(shape=(img_size, img_size, channel_count * 3))
 		curr_layer = perception_input
@@ -47,17 +55,41 @@ class CellularAutomata(tf.keras.Model):
 
 	@tf.function
 	def perceive(self, x):
-		# Pad the input state around the boundaries using the topology of a torus 
-		# to make sure that the world's behavior is isotropic.
-		# multiples = [1, 3, 3, 1]
-		# t1 = tf.tile(x, multiples)
-		# w = self.img_size
-		# x = t1[:, w-1 : w-1+w+2, w-1 : w-1+w+2, :]
+		pad_mode = None
+
+		if self.edge_strategy == EdgeStrategy.TF_SAME:
+			pad_mode = "SAME"
+
+		elif self.edge_strategy == EdgeStrategy.TORUS:
+			pad_mode = "VALID"
+			# Pad the input state around the boundaries using the topology of a torus 
+			# to make sure that the world's behavior is isotropic.
+			multiples = [1, 3, 3, 1]
+			t1 = tf.tile(x, multiples)
+			w = self.img_size
+			x = t1[:, w-1 : w-1+w+2, w-1 : w-1+w+2, :]
+
+		elif str(self.edge_strategy).startswith('pad_const '):
+			const_val = 0.0
+			if self.edge_strategy == EdgeStrategy.ZEROS:
+				const_val = 0.0
+			elif self.edge_strategy == EdgeStrategy.ONES:
+				const_val = 1.0
+
+			pad_mode = "VALID"
+			paddings = tf.constant([[0,0], [1,1], [1,1], [0,0]])
+			x = tf.pad(x, paddings, "CONSTANT", constant_values=const_val)
+
+		elif self.edge_strategy == EdgeStrategy.MIRROR:
+			pad_mode = "VALID"
+			paddings = tf.constant([[0,0], [1,1], [1,1], [0,0]])
+			x = tf.pad(x, paddings, "SYMMETRIC")
 
 		conv = tf.nn.depthwise_conv2d(x, 
 			filter=self.perception_kernel, 
 			strides=[1, 1, 1, 1],
-			padding="SAME")
+			padding=pad_mode)
+
 		return conv
 
 	@tf.function
