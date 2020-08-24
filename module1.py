@@ -18,7 +18,7 @@ class CellularAutomata(tf.keras.Model):
 		self.img_size = img_size
 		self.channel_count = channel_count
 		self.conserve_mass = False
-		self.noise = 0.0
+		self.noise_range = (-0.1, 0.1)
 		self.clamp_values = True
 
 		perception_input = tf.keras.layers.Input(shape=(img_size, img_size, channel_count * 3))
@@ -49,15 +49,15 @@ class CellularAutomata(tf.keras.Model):
 	def perceive(self, x):
 		# Pad the input state around the boundaries using the topology of a torus 
 		# to make sure that the world's behavior is isotropic.
-		multiples = [1, 3, 3, 1]
-		t1 = tf.tile(x, multiples)
-		w = self.img_size
-		x = t1[:, w-1 : w-1+w+2, w-1 : w-1+w+2, :]
+		# multiples = [1, 3, 3, 1]
+		# t1 = tf.tile(x, multiples)
+		# w = self.img_size
+		# x = t1[:, w-1 : w-1+w+2, w-1 : w-1+w+2, :]
 
 		conv = tf.nn.depthwise_conv2d(x, 
 			filter=self.perception_kernel, 
 			strides=[1, 1, 1, 1],
-			padding="VALID")
+			padding="SAME")
 		return conv
 
 	@tf.function
@@ -71,7 +71,9 @@ class CellularAutomata(tf.keras.Model):
 		x += dx
 		
 		# Add random noise.
-		x += (tf.cast(tf.random.uniform(tf.shape(x[:, :, :, :])), tf.float32) - 0.5) * 2.0 * self.noise
+		noise_len = self.noise_range[1] - self.noise_range[0]
+		noise_val = tf.cast(tf.random.uniform(tf.shape(x[:, :, :, :])), tf.float32)
+		x += noise_val * noise_len + self.noise_range[0]
 		
 		# Keep random noise or changes in dx from causing out-of-range values.
 		if self.clamp_values:
@@ -198,6 +200,9 @@ class Training(object):
 			plt.yscale('log')
 			plt.grid()
 			plt.show()
+
+	def is_done(self):
+		return self.loss_hist and self.loss_hist[-1] <= 0
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
 		max_plateau_len=None):
@@ -244,7 +249,7 @@ class Training(object):
 			elapsed_seconds = time.time() - start
 			
 			num_steps += 1
-			if self.loss_hist and self.loss_hist[-1] <= 0: 
+			if self.is_done(): 
 				print("Stopping due to zero loss")
 				return
 
