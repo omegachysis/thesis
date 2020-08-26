@@ -4,6 +4,7 @@ from tensorflow import keras
 import numpy as np
 import PIL.Image
 import IPython.display
+import math
 import io
 import random
 import time
@@ -132,14 +133,13 @@ class CellularAutomata(tf.keras.Model):
 		x[:, :, :3] = color_arr
 		return x
 
-	def constfilled(self, x):
-		""" Fills the world with ones. """
-		return np.ones((self.img_size, self.img_size, self.channel_count), dtype=np.float32) * x
+	def constfilled(self, u):
+		""" Fills the world with u. """
+		return np.ones((self.img_size, self.img_size, self.channel_count), dtype=np.float32) * u
 			
-	def pointfilled(self):
-		""" Fills the world with zeros except for a single point. """
-		x = np.zeros((self.img_size, self.img_size, self.channel_count), dtype=np.float32)
-		x[self.img_size // 2, self.img_size // 2] = np.ones((self.channel_count,))
+	def pointfilled(self, x, point_value):
+		""" Add a single point of value u. """
+		x[self.img_size // 2, self.img_size // 2] = np.ones((self.channel_count,)) * point_value
 		return x
 	
 	def randomfilled(self):
@@ -154,8 +154,13 @@ class CellularAutomata(tf.keras.Model):
 		return padded[:, :, 1:-1]
 			
 	def to_image(self, x, scale=1):
-		# Slice off all the non-color (hidden channels):
-		arr = x[..., :3]
+		hsize = math.ceil(self.channel_count / 3)
+		arr = np.zeros((self.img_size, self.img_size * hsize, 3))
+		# Fill the image array with the RGB images generated from the 
+		# state in RGB and the hidden channels in groups of 3.
+		for i in range(hsize):
+			arr[:, self.img_size*i : self.img_size*(i+1), :] = x[..., i*3 : (i+1)*3]
+
 		rgb_array = np.uint8(arr * 255.0)
 
 		# Scale the first two dimensions of the image by the given scale.
@@ -226,10 +231,10 @@ class Training(object):
 		x = x0()[None, ...]
 				
 		xs = []
-		xs.append(x[0, ..., :3])
+		xs.append(x[0, ...])
 		for i in range(lifetime):
 			x = self.ca(x)
-			xs.append(x[0, ..., :3])
+			xs.append(x[0, ...])
 	
 		print("Sample run:")
 		self.ca.display_gif(xs)
@@ -244,11 +249,12 @@ class Training(object):
 			plt.show()
 
 	def is_done(self):
-		return self.loss_hist and self.loss_hist[-1] <= 0
+		return self.loss_hist and \
+			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
 		max_plateau_len=None):
-		if self.loss_hist and self.loss_hist[-1] <= 0: return
+		if self.is_done(): return
 
 		initial = result = loss = None
 		start = time.time()
