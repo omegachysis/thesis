@@ -31,7 +31,16 @@ class CellularAutomata(tf.keras.Model):
 		self.clamp_values = True
 		self.edge_strategy = EdgeStrategy.TF_SAME
 
-		perception_input = tf.keras.layers.Input(shape=(img_size, img_size, channel_count * 3))
+		# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
+		# to create a dot product along the 3rd axis, but we don't need that so we index
+		# it with None:
+		perception_kernel = perception_kernel[:, :, None, :]
+		perception_kernel = tf.repeat(perception_kernel, 
+			repeats=self.channel_count, axis=2)
+		self.perception_kernel = perception_kernel
+
+		perception_input = tf.keras.layers.Input(
+			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1]))
 		curr_layer = perception_input
 		for layer_count in layer_counts:
 			curr_layer = tf.keras.layers.Conv2D(filters=layer_count, kernel_size=1,
@@ -40,14 +49,6 @@ class CellularAutomata(tf.keras.Model):
 			activation=None, kernel_initializer=tf.zeros_initializer)(curr_layer)
 
 		self.model = tf.keras.Model(inputs=[perception_input], outputs=output_layer)
-
-		# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
-		# to create a dot product along the 3rd axis, but we don't need that so we index
-		# it with None:
-		perception_kernel = perception_kernel[:, :, None, :]
-		perception_kernel = tf.repeat(perception_kernel, 
-			repeats=self.channel_count, axis=2)
-		self.perception_kernel = perception_kernel
 
 	def pad_repeat(self, tensor):
 		multiples = [3, 3]
@@ -174,13 +175,13 @@ class CellularAutomata(tf.keras.Model):
 	
 	def display_gif(self, xs, scale=None):
 		if scale is None:
-			scale = 64 // self.img_size
+			scale = 128 // self.img_size
 				
 		out = io.BytesIO()
 		imgs = [self.to_image(x, scale) for x in xs]
-		durs = [100 for img in imgs]
-		durs[0] = 1000
-		durs[-1] = 1000
+		durs = [50 for img in imgs]
+		durs[0] = 500
+		durs[-1] = 500
 		imgs[0].save(out, 'gif', save_all=True, append_images=imgs[1:], loop=0, duration=durs)
 		img = IPython.display.Image(data=out.getvalue())
 		IPython.display.display(img)
@@ -293,7 +294,7 @@ class Training(object):
 
 			self.loss_hist.append(loss.numpy())
 			# Feed the final state back in and train again on that.
-			#x, loss = self.train_step(x, target, lifetime)
+			x, loss = self.train_step(x, target, lifetime)
 			elapsed_seconds = time.time() - start
 			
 			num_steps += 1
