@@ -164,6 +164,21 @@ class CellularAutomata(tf.keras.Model):
 		shrunk = x[width:-width, width:-width, :]
 		padded = np.pad(shrunk, pad_width=width, mode='constant', constant_values=border_value)
 		return padded[:, :, width:-width]
+
+	def linefilled(self, x, line_value, a, b):
+		""" Fills the input state with a line from pt a to pt b. """
+		ax, ay = a
+		bx, by = b
+		for i in range(self.img_size*2 + 1):
+			t = i/(self.img_size*2)
+			px = int((ax + (bx - ax) * t) * self.img_size)
+			py = int((ay + (by - ay) * t) * self.img_size)
+			if px < 0 or py < 0: continue
+			if px >= self.img_size or py >= self.img_size: continue
+
+			for channel in range(self.channel_count):
+				x[px, py, channel] = line_value
+		return x
 			
 	def to_image(self, x, scale=1):
 		hsize = math.ceil(self.channel_count / 3)
