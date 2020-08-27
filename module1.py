@@ -138,9 +138,15 @@ class CellularAutomata(tf.keras.Model):
 		""" Fills the world with u. """
 		return np.ones((self.img_size, self.img_size, self.channel_count), dtype=np.float32) * u
 			
-	def pointfilled(self, x, point_value):
+	def pointfilled(self, x, point_value, pos=(.5,.5)):
 		""" Add a single point of value u. """
-		x[self.img_size // 2, self.img_size // 2] = np.ones((self.channel_count,)) * point_value
+		x[int(self.img_size*pos[0]), int(self.img_size*pos[1])] = \
+			np.ones((self.channel_count,)) * point_value
+		return x
+
+	def pointsfilled(self, x, point_value, positions):
+		for pos in positions:
+			x = self.pointfilled(x, point_value, pos)
 		return x
 	
 	def randomfilled(self):
@@ -148,11 +154,11 @@ class CellularAutomata(tf.keras.Model):
 		x = np.random.rand(self.img_size, self.img_size, self.channel_count).astype(np.float32)
 		return x
 
-	def bordered(self, x, border_value):
+	def bordered(self, x, border_value, width=1):
 		""" Fills the input state with a border of the given value. """
-		shrunk = x[1:-1, 1:-1, :]
-		padded = np.pad(shrunk, pad_width=1, mode='constant', constant_values=border_value)
-		return padded[:, :, 1:-1]
+		shrunk = x[width:-width, width:-width, :]
+		padded = np.pad(shrunk, pad_width=width, mode='constant', constant_values=border_value)
+		return padded[:, :, width:-width]
 			
 	def to_image(self, x, scale=1):
 		hsize = math.ceil(self.channel_count / 3)
@@ -240,8 +246,9 @@ class Training(object):
 		return xs
 	
 	def show_sample_run(self, x0, xf, lifetime):
-		print("Target:")
-		self.ca.display(xf())
+		if xf:
+			print("Target:")
+			self.ca.display(xf())
 
 		xs = self.do_sample_run(x0, xf, lifetime)
 	
