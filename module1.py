@@ -173,7 +173,7 @@ class CellularAutomata(tf.keras.Model):
 		PIL.Image.fromarray(rgb_array).save(out, 'png')
 		return IPython.display.Image(data=out.getvalue())
 	
-	def display_gif(self, xs, scale=None):
+	def create_gif(self, xs, scale=None):
 		if scale is None:
 			scale = 128 // self.img_size
 				
@@ -183,7 +183,10 @@ class CellularAutomata(tf.keras.Model):
 		durs[0] = 500
 		durs[-1] = 500
 		imgs[0].save(out, 'gif', save_all=True, append_images=imgs[1:], loop=0, duration=durs)
-		img = IPython.display.Image(data=out.getvalue())
+		return out.getvalue()
+		
+	def display_gif(self, xs, scale=None):
+		img = IPython.display.Image(data=self.create_gif(xs, scale))
 		IPython.display.display(img)
 
 	def display(self, x, scale=None):
@@ -223,11 +226,8 @@ class Training(object):
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]
 		self.trainer.apply_gradients(zip(grads, self.ca.weights))
 		return x, loss
-	
-	def show_sample_run(self, x0, xf, lifetime):
-		print("Target:")
-		self.ca.display(xf())
-		
+
+	def do_sample_run(self, x0, xf, lifetime):
 		# Run the CA for its lifetime with the current weights.
 		x = x0()[None, ...]
 				
@@ -236,17 +236,30 @@ class Training(object):
 		for i in range(lifetime):
 			x = self.ca(x)
 			xs.append(x[0, ...])
+
+		return xs
+	
+	def show_sample_run(self, x0, xf, lifetime):
+		print("Target:")
+		self.ca.display(xf())
+
+		xs = self.do_sample_run(x0, xf, lifetime)
 	
 		print("Sample run:")
 		self.ca.display_gif(xs)
-			
-	def show_loss_history(self):
+
+	def _graph_loss_hist(self):
+		plt.clf()
 		if self.loss_hist:
 			print("\n step: %d, loss: %.3f, log10(loss): %.3f" % (
 				len(self.loss_hist), self.loss_hist[-1], np.log10(self.loss_hist[-1])), end='')
 			plt.plot(self.loss_hist)
 			plt.yscale('log')
 			plt.grid()
+			
+	def show_loss_history(self):
+		if self.loss_hist:
+			self._graph_loss_hist()
 			plt.show()
 
 	def is_done(self):
@@ -305,14 +318,14 @@ class Training(object):
 		else:
 			raise ValueError()
 					
-	def save(self):
-		self.ca.model.save_weights("./checkpoints/data")
-			
-	def save_exists(self):
-		return os.path.isdir("./checkpoints")
-			
-	def load(self):
-		self.ca.model.load_weights("./checkpoints/data")
+	def save(self, name, sample_run_xs):
+		self.ca.model.save_weights(f"./results/{name}_weights")
+		with open(f"./results/{name}_loss_hist.txt", 'w') as f:
+			f.writelines([str(loss)+'\n' for loss in self.loss_hist])
+		self._graph_loss_hist()
+		plt.savefig(f"./results/{name}_loss_hist.png")
+		with open(f"./results/{name}_sample_run.gif", 'wb') as f:
+			f.write(self.ca.create_gif(sample_run_xs))
 
 def sobel_state_kernel():
 	# Create a Sobel filter:
@@ -331,10 +344,7 @@ def tensor_basis_kernel():
 			basis.append(tensor)
 	return tf.stack(basis, axis=-1)
 
-def init_training(ca, do_load=False, learning_rate=1.0e-3):
+def init_training(ca, learning_rate=1.0e-3):
 	ca.model.summary()
 	training = Training(ca=ca, learning_rate=learning_rate)
-	if training.save_exists() and do_load:
-		training.load()
-		print("Loaded trained model")
 	return training
