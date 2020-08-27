@@ -30,6 +30,7 @@ class CellularAutomata(tf.keras.Model):
 		self.noise_range = (0.0, 0.0)
 		self.clamp_values = True
 		self.edge_strategy = EdgeStrategy.TF_SAME
+		self.value_weight_map = None
 
 		# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
 		# to create a dot product along the 3rd axis, but we don't need that so we index
@@ -112,7 +113,11 @@ class CellularAutomata(tf.keras.Model):
 		# Add mass conservation to the model by subtracting the average of the dx values.
 		if self.conserve_mass:
 			dx -= tf.math.reduce_mean(dx)
-		x += dx
+
+		if self.value_weight_map is not None:
+			x += dx * self.value_weight_map
+		else:
+			x += dx
 		
 		# Add random noise.
 		noise_len = self.noise_range[1] - self.noise_range[0]
@@ -274,7 +279,7 @@ class Training(object):
 			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
-		max_plateau_len=None):
+		max_plateau_len=None, use_feedback=True):
 		if self.is_done(): return
 
 		initial = result = loss = None
@@ -313,8 +318,11 @@ class Training(object):
 				plateau += 1
 
 			self.loss_hist.append(loss.numpy())
-			# Feed the final state back in and train again on that.
-			x, loss = self.train_step(x, target, lifetime)
+
+			if use_feedback:
+				# Feed the final state back in and train again on that.
+				x, loss = self.train_step(x, target, lifetime)
+
 			elapsed_seconds = time.time() - start
 			
 			num_steps += 1
