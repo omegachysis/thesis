@@ -106,7 +106,7 @@ class CellularAutomata(tf.keras.Model):
 		return conv
 
 	@tf.function
-	def call(self, x):
+	def call(self, x, value_weight_release):
 		s = self.perceive(x)
 		dx = self.model(s)
 		
@@ -114,7 +114,7 @@ class CellularAutomata(tf.keras.Model):
 		if self.conserve_mass:
 			dx -= tf.math.reduce_mean(dx)
 
-		if self.value_weight_map is not None:
+		if self.value_weight_map is not None and not value_weight_release:
 			x += dx * self.value_weight_map
 		else:
 			x += dx
@@ -132,7 +132,7 @@ class CellularAutomata(tf.keras.Model):
 	
 	def imagefilled(self, image_path):
 		""" Fills the world with image data from the disk. """
-		x = self.constfilled(0.0)
+		x = self.constfilled(1.0)
 		img = PIL.Image.open(image_path).convert("RGB")
 		img = img.resize(size=(self.img_size, self.img_size))
 		color_arr = np.float32(img) / 255.0
@@ -241,11 +241,11 @@ class Training(object):
 		return tf.reduce_sum(x)
 
 	@tf.function
-	def train_step(self, x0, xf, lifetime):
+	def train_step(self, x0, xf, lifetime, value_weight_release=None):
 		x = x0
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
-				x = self.ca(x)
+				x = self.ca(x, i >= value_weight_release and value_weight_release is not None)
 			loss = tf.reduce_mean(self.get_loss(x, xf))
 				
 		grads = g.gradient(loss, self.ca.weights)
@@ -253,24 +253,26 @@ class Training(object):
 		self.trainer.apply_gradients(zip(grads, self.ca.weights))
 		return x, loss
 
-	def do_sample_run(self, x0, xf, lifetime):
+	def do_sample_run(self, x0, xf, lifetime, value_weight_release=None):
+		self.ca.value_weight_release = False
+
 		# Run the CA for its lifetime with the current weights.
 		x = x0()[None, ...]
 				
 		xs = []
 		xs.append(x[0, ...])
 		for i in range(lifetime):
-			x = self.ca(x)
+			x = self.ca(x, i >= value_weight_release and value_weight_release is not None)
 			xs.append(x[0, ...])
 
 		return xs
 	
-	def show_sample_run(self, x0, xf, lifetime):
+	def show_sample_run(self, x0, xf, lifetime, value_weight_release=None):
 		if xf:
 			print("Target:")
 			self.ca.display(xf())
 
-		xs = self.do_sample_run(x0, xf, lifetime)
+		xs = self.do_sample_run(x0, xf, lifetime, value_weight_release)
 	
 		print("Sample run:")
 		self.ca.display_gif(xs)
@@ -294,7 +296,7 @@ class Training(object):
 			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
-		max_plateau_len=None, use_feedback=True):
+		max_plateau_len=None, use_feedback=True, value_weight_release=None):
 		if self.is_done(): return
 
 		initial = result = loss = None
@@ -325,7 +327,7 @@ class Training(object):
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
 			target = np.repeat(xf()[None, ...], 1, 0)
-			x, loss = self.train_step(initial, target, lifetime)
+			x, loss = self.train_step(initial, target, lifetime, value_weight_release)
 			if best_loss is None or loss.numpy() < best_loss:
 				best_loss = loss.numpy()
 				plateau = 0
