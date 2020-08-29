@@ -105,14 +105,15 @@ class CellularAutomata(tf.keras.Model):
 
 		return conv
 
+	def get_mass(self, x):
+		return tf.reduce_sum(x)
+
 	@tf.function
 	def call(self, x, value_weight_release):
 		s = self.perceive(x)
-		dx = self.model(s)
-		
-		# Add mass conservation to the model by subtracting the average of the dx values.
-		if self.conserve_mass:
-			dx -= tf.math.reduce_mean(dx)
+		dx = tf.clip_by_value(self.model(s), -1.0, 1.0)
+
+		old_mass = tf.reduce_sum(x)
 
 		if self.value_weight_map is not None and not value_weight_release:
 			x += dx * self.value_weight_map
@@ -123,9 +124,13 @@ class CellularAutomata(tf.keras.Model):
 		noise_len = self.noise_range[1] - self.noise_range[0]
 		noise_val = tf.cast(tf.random.uniform(tf.shape(x[:, :, :, :])), tf.float32)
 		x += noise_val * noise_len + self.noise_range[0]
-		
+
 		# Keep random noise or changes in dx from causing out-of-range values.
-		if self.clamp_values:
+		x = tf.clip_by_value(x, 0.0, 1.0)
+
+		if self.conserve_mass:
+			new_mass = tf.reduce_sum(x)
+			x /= new_mass / old_mass
 			x = tf.clip_by_value(x, 0.0, 1.0)
 				
 		return x
@@ -235,7 +240,7 @@ class Training(object):
 		self.trainer = tf.keras.optimizers.Adam(self.lr_sched)
 
 	def get_loss(self, x, target):
-		return tf.reduce_mean(tf.square(x[..., :3] - target[..., :3]))
+		return tf.reduce_mean(tf.square(x - target))
 
 	def get_sum(self, x):
 		return tf.reduce_sum(x)
@@ -245,7 +250,7 @@ class Training(object):
 		x = x0
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
-				x = self.ca(x, i >= value_weight_release and value_weight_release is not None)
+				x = self.ca(x, value_weight_release is not None and i >= value_weight_release)
 			loss = tf.reduce_mean(self.get_loss(x, xf))
 				
 		grads = g.gradient(loss, self.ca.weights)
@@ -262,7 +267,7 @@ class Training(object):
 		xs = []
 		xs.append(x[0, ...])
 		for i in range(lifetime):
-			x = self.ca(x, i >= value_weight_release and value_weight_release is not None)
+			x = self.ca(x, value_weight_release is not None and i >= value_weight_release)
 			xs.append(x[0, ...])
 
 		return xs
@@ -273,9 +278,12 @@ class Training(object):
 			self.ca.display(xf())
 
 		xs = self.do_sample_run(x0, xf, lifetime, value_weight_release)
+		print("mass at t0:", self.ca.get_mass(x0()))
+		print("mass at tf:", self.ca.get_mass(xs[-1]))
 	
 		print("Sample run:")
 		self.ca.display_gif(xs)
+		return xs
 
 	def _graph_loss_hist(self):
 		plt.clf()
