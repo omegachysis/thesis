@@ -106,14 +106,14 @@ class CellularAutomata(tf.keras.Model):
 		return conv
 
 	def get_mass(self, x):
-		return tf.reduce_sum(x)
+		return tf.reduce_sum(x, axis=[0,1])
 
 	@tf.function
 	def call(self, x, value_weight_release):
 		s = self.perceive(x)
-		dx = tf.clip_by_value(self.model(s), -1.0, 1.0)
+		dx = self.model(s)
 
-		old_mass = tf.reduce_sum(x)
+		old_mass = tf.reduce_sum(x, [1,2])
 
 		if self.value_weight_map is not None and not value_weight_release:
 			x += dx * self.value_weight_map
@@ -129,8 +129,8 @@ class CellularAutomata(tf.keras.Model):
 		x = tf.clip_by_value(x, 0.0, 1.0)
 
 		if self.conserve_mass:
-			new_mass = tf.reduce_sum(x)
-			x /= new_mass / old_mass
+			new_mass = tf.reduce_sum(x, [1,2])
+			x *= old_mass / (new_mass + 1e-10)
 			x = tf.clip_by_value(x, 0.0, 1.0)
 				
 		return x
@@ -304,7 +304,7 @@ class Training(object):
 			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
-		max_plateau_len=None, use_feedback=True, value_weight_release=None):
+		max_plateau_len=None, value_weight_release=None):
 		if self.is_done(): return
 
 		initial = result = loss = None
@@ -343,11 +343,6 @@ class Training(object):
 				plateau += 1
 
 			self.loss_hist.append(loss.numpy())
-
-			if use_feedback:
-				# Feed the final state back in and train again on that.
-				x, loss = self.train_step(x, target, lifetime)
-
 			elapsed_seconds = time.time() - start
 			
 			num_steps += 1
