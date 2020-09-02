@@ -26,7 +26,7 @@ class CellularAutomata(tf.keras.Model):
 
 		self.img_size = img_size
 		self.channel_count = channel_count
-		self.conserve_mass = False
+		self.conserved_mass = None
 		self.noise_range = (0.0, 0.0)
 		self.clamp_values = True
 		self.edge_strategy = EdgeStrategy.TF_SAME
@@ -112,25 +112,26 @@ class CellularAutomata(tf.keras.Model):
 	def call(self, x, value_weight_release):
 		s = self.perceive(x)
 		dx = self.model(s)
-
 		old_mass = tf.reduce_sum(x, [1,2])
 
 		if self.value_weight_map is not None and not value_weight_release:
 			x += dx * self.value_weight_map
 		else:
 			x += dx
-		
-		# Add random noise.
-		noise_len = self.noise_range[1] - self.noise_range[0]
-		noise_val = tf.cast(tf.random.uniform(tf.shape(x[:, :, :, :])), tf.float32)
-		x += noise_val * noise_len + self.noise_range[0]
 
-		# Keep random noise or changes in dx from causing out-of-range values.
 		x = tf.clip_by_value(x, 0.0, 1.0)
 
-		if self.conserve_mass:
+		if self.conserved_mass is not None:
 			new_mass = tf.reduce_sum(x, [1,2])
-			x *= old_mass / (new_mass + 1e-10)
+			x *= (self.conserved_mass + 1e-10) / (new_mass + 1e-10)
+			x = tf.clip_by_value(x, 0.0, 1.0)
+
+		if self.noise_range is not None:
+			# Add random noise.
+			noise_len = self.noise_range[1] - self.noise_range[0]
+			noise_val = tf.cast(tf.random.uniform(tf.shape(x[:, :, :, :])), tf.float32)
+			x += noise_val * noise_len + self.noise_range[0]
+			# Keep random noise or changes in dx from causing out-of-range values.
 			x = tf.clip_by_value(x, 0.0, 1.0)
 				
 		return x
