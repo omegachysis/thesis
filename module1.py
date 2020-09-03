@@ -19,6 +19,21 @@ class EdgeStrategy:
 	MIRROR = 2
 	RANDOM = 3
 
+def loss_mean_square(x, target):
+	return tf.reduce_mean(tf.square(x - target))
+
+def loss_harmonize(x):
+	channel_count = x.shape[3]
+	Δ = tf.reshape(tf.constant([
+			[1/4, 1/2, 1/4],
+			[1/2, -3,  1/2],
+			[1/4, 1/2, 1/4]
+	]), shape=[3,3,1])
+	Δ = Δ[:,:,None,:]
+	Δ = tf.repeat(Δ, repeats=channel_count, axis=2)
+	Δx = tf.nn.depthwise_conv2d(x, Δ, strides=[1,1,1,1], padding="VALID")[0]
+	return tf.reduce_mean(tf.square(Δx))
+
 class CellularAutomata(tf.keras.Model):
 	def __init__(self, img_size: int, 
 	channel_count: int, layer_counts: [int], perception_kernel):
@@ -50,6 +65,17 @@ class CellularAutomata(tf.keras.Model):
 			activation=None, kernel_initializer=tf.zeros_initializer)(curr_layer)
 
 		self.model = tf.keras.Model(inputs=[perception_input], outputs=output_layer)
+
+	def laplacian(self, x):
+		Δ = tf.reshape(tf.constant([
+				[1/4, 1/2, 1/4],
+				[1/2, -3,  1/2],
+				[1/4, 1/2, 1/4]
+		]), shape=[3,3,1])
+		Δ = Δ[:,:,None,:]
+		Δ = tf.repeat(Δ, repeats=self.channel_count, axis=2)
+		Δx = tf.nn.depthwise_conv2d(x[None,...], Δ, strides=[1,1,1,1], padding="SAME")[0]
+		return Δx
 
 	def pad_repeat(self, tensor):
 		multiples = [3, 3]
@@ -240,19 +266,18 @@ class Training(object):
 			values = [self.learning_rate, self.learning_rate * 0.1])
 		self.trainer = tf.keras.optimizers.Adam(self.lr_sched)
 
-	def get_loss(self, x, target):
-		return tf.reduce_mean(tf.square(x - target))
-
 	def get_sum(self, x):
 		return tf.reduce_sum(x)
 
 	@tf.function
-	def train_step(self, x0, xf, lifetime, value_weight_release=None):
+	def train_step(self, x0, xf, lifetime, value_weight_release=None, loss_f=None):
+		if loss_f is None: loss_f = lambda x: loss_mean_square(x, xf)
+
 		x = x0
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
 				x = self.ca(x, value_weight_release is not None and i >= value_weight_release)
-			loss = tf.reduce_mean(self.get_loss(x, xf))
+			loss = tf.reduce_mean(loss_f(x))
 				
 		grads = g.gradient(loss, self.ca.weights)
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]
@@ -305,7 +330,7 @@ class Training(object):
 			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
-		max_plateau_len=None, value_weight_release=None):
+		max_plateau_len=None, value_weight_release=None, loss_f=None):
 		if self.is_done(): return
 
 		initial = result = loss = None
@@ -335,8 +360,8 @@ class Training(object):
 					return
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
-			target = np.repeat(xf()[None, ...], 1, 0)
-			x, loss = self.train_step(initial, target, lifetime, value_weight_release)
+			target = np.repeat(xf()[None, ...], 1, 0) if xf is not None else None
+			x, loss = self.train_step(initial, target, lifetime, value_weight_release, loss_f)
 			if best_loss is None or loss.numpy() < best_loss:
 				best_loss = loss.numpy()
 				plateau = 0
