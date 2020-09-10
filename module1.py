@@ -10,6 +10,7 @@ import random
 import time
 import statistics as stats
 from matplotlib import pyplot as plt
+from typing import List
 
 class EdgeStrategy:
 	TF_SAME = 0
@@ -19,8 +20,11 @@ class EdgeStrategy:
 	MIRROR = 2
 	RANDOM = 3
 
-def loss_mean_square(x, target):
-	return tf.reduce_mean(tf.square(x - target))
+def loss_mean_square(x, target, mask=None):
+	if mask is not None:
+		return tf.reduce_mean(mask * tf.square(x[...,:3] - target[...,:3]))
+	else:
+		return tf.reduce_mean(mask * tf.square(x[...,:3] - target[...,:3])) 
 
 def loss_harmonize(x):
 	channel_count = x.shape[3]
@@ -36,16 +40,18 @@ def loss_harmonize(x):
 
 class CellularAutomata(tf.keras.Model):
 	def __init__(self, img_size: int, 
-	channel_count: int, layer_counts: [int], perception_kernel):
+	channel_count: int, layer_counts: List[int], perception_kernel):
 		super().__init__()
 
 		self.img_size = img_size
 		self.channel_count = channel_count
 		self.conserved_mass = None
 		self.noise_range = (0.0, 0.0)
+		self.noise_mask = None
+		self.noise_replace = False
 		self.clamp_values = True
 		self.edge_strategy = EdgeStrategy.TF_SAME
-		self.value_weight_map = None
+		self.lock_map = None
 
 		# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
 		# to create a dot product along the 3rd axis, but we don't need that so we index
@@ -135,13 +141,12 @@ class CellularAutomata(tf.keras.Model):
 		return tf.reduce_sum(x, axis=[0,1])
 
 	@tf.function
-	def call(self, x, value_weight_release):
+	def call(self, x, lock_release):
 		s = self.perceive(x)
 		dx = self.model(s)
-		old_mass = tf.reduce_sum(x, [1,2])
 
-		if self.value_weight_map is not None and not value_weight_release:
-			x += dx * self.value_weight_map
+		if self.lock_map is not None and not lock_release:
+			x += dx * self.lock_map
 		else:
 			x += dx
 
@@ -155,8 +160,15 @@ class CellularAutomata(tf.keras.Model):
 		if self.noise_range is not None:
 			# Add random noise.
 			noise_len = self.noise_range[1] - self.noise_range[0]
-			noise_val = tf.cast(tf.random.uniform(tf.shape(x[:, :, :, :])), tf.float32)
-			x += noise_val * noise_len + self.noise_range[0]
+			noise_val = tf.cast(tf.random.uniform(tf.shape(x)), tf.float32)
+			if self.noise_mask is not None:
+				noise_val *= self.noise_mask
+
+			if self.noise_replace and self.noise_mask is not None:
+				x = x * (1.0-self.noise_mask) + \
+					noise_val * noise_len + self.noise_range[0]
+			else:
+				x += noise_val * noise_len + self.noise_range[0]
 			# Keep random noise or changes in dx from causing out-of-range values.
 			x = tf.clip_by_value(x, 0.0, 1.0)
 				
@@ -270,40 +282,38 @@ class Training(object):
 		return tf.reduce_sum(x)
 
 	@tf.function
-	def train_step(self, x0, xf, lifetime, value_weight_release=None, loss_f=None):
+	def train_step(self, x0, xf, lifetime, lock_release=None, loss_f=None):
 		if loss_f is None: loss_f = lambda x: loss_mean_square(x, xf)
 
 		x = x0
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
-				x = self.ca(x, value_weight_release is not None and i >= value_weight_release)
-			loss = tf.reduce_mean(loss_f(x))
+				x = self.ca(x, lock_release is not None and i >= lock_release)
+			loss = loss_f(x)
 				
 		grads = g.gradient(loss, self.ca.weights)
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]
 		self.trainer.apply_gradients(zip(grads, self.ca.weights))
 		return x, loss
 
-	def do_sample_run(self, x0, xf, lifetime, value_weight_release=None):
-		self.ca.value_weight_release = False
-
+	def do_sample_run(self, x0, xf, lifetime, lock_release=None):
 		# Run the CA for its lifetime with the current weights.
 		x = x0()[None, ...]
 				
 		xs = []
 		xs.append(x[0, ...])
 		for i in range(lifetime):
-			x = self.ca(x, value_weight_release is not None and i >= value_weight_release)
+			x = self.ca(x, lock_release is not None and i >= lock_release)
 			xs.append(x[0, ...])
 
 		return xs
 	
-	def show_sample_run(self, x0, xf, lifetime, value_weight_release=None):
+	def show_sample_run(self, x0, xf, lifetime, lock_release=None):
 		if xf:
 			print("Target:")
 			self.ca.display(xf())
 
-		xs = self.do_sample_run(x0, xf, lifetime, value_weight_release)
+		xs = self.do_sample_run(x0, xf, lifetime, lock_release)
 		print("mass at t0:", self.ca.get_mass(x0()))
 		print("mass at tf:", self.ca.get_mass(xs[-1]))
 	
@@ -330,7 +340,7 @@ class Training(object):
 			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
 	
 	def run(self, x0, xf, lifetime, max_seconds=None, max_steps=None, target_loss=None,
-		max_plateau_len=None, value_weight_release=None, loss_f=None):
+		max_plateau_len=None, lock_release=None, loss_f=None):
 		if self.is_done(): return
 
 		initial = result = loss = None
@@ -361,7 +371,7 @@ class Training(object):
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
 			target = np.repeat(xf()[None, ...], 1, 0) if xf is not None else None
-			x, loss = self.train_step(initial, target, lifetime, value_weight_release, loss_f)
+			x, loss = self.train_step(initial, target, lifetime, lock_release, loss_f)
 			if best_loss is None or loss.numpy() < best_loss:
 				best_loss = loss.numpy()
 				plateau = 0
@@ -375,9 +385,6 @@ class Training(object):
 			if self.is_done(): 
 				print("Stopping due to zero loss")
 				return
-
-		else:
-			raise ValueError()
 					
 	def save(self, name, sample_run_xs):
 		self.ca.model.save_weights(f"./results/{name}_weights")
