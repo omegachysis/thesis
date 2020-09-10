@@ -24,7 +24,7 @@ def loss_mean_square(x, target, mask=None):
 	if mask is not None:
 		return tf.reduce_mean(mask[...,:3] * tf.square(x[...,:3] - target[...,:3]))
 	else:
-		return tf.reduce_mean(mask[...,:3] * tf.square(x[...,:3] - target[...,:3])) 
+		return tf.reduce_mean(tf.square(x[...,:3] - target[...,:3])) 
 
 def loss_harmonize(x):
 	channel_count = x.shape[3]
