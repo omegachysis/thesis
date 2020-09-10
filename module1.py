@@ -24,7 +24,10 @@ def loss_mean_square(x, target, mask=None):
 	if mask is not None:
 		return tf.reduce_mean(mask[...,:3] * tf.square(x[...,:3] - target[...,:3]))
 	else:
-		return tf.reduce_mean(tf.square(x[...,:3] - target[...,:3])) 
+		return tf.reduce_mean(tf.square(x[...,:3] - target[...,:3]))
+
+def loss_all_channels(x, target):
+	return tf.reduce_mean(tf.square(x - target))
 
 def loss_harmonize(x):
 	channel_count = x.shape[3]
@@ -181,6 +184,17 @@ class CellularAutomata(tf.keras.Model):
 		img = img.resize(size=(self.img_size, self.img_size))
 		color_arr = np.float32(img) / 255.0
 		x[:, :, :3] = color_arr
+		return x
+
+	def imagestackfilled(self, images: List[str]):
+		""" Fills the world with image data from the disk. """
+		x = self.constfilled(1.0)
+		for i in range(len(images)):
+			image_path = images[i]
+			img = PIL.Image.open(image_path).convert("RGB")
+			img = img.resize(size=(self.img_size, self.img_size))
+			color_arr = np.float32(img) / 255.0
+			x[..., i*3:i*3+3] = color_arr
 		return x
 
 	def constfilled(self, u):
