@@ -203,7 +203,7 @@ class CellularAutomata(tf.keras.Model):
 			
 	def pointfilled(self, x, point_value, pos=(.5,.5)):
 		""" Add a single point of value u. """
-		x[int(self.img_size*pos[0]), int(self.img_size*pos[1])] = \
+		x[int(self.img_size*pos[1]), int(self.img_size*pos[0])] = \
 			np.ones((self.channel_count,)) * point_value
 		return x
 
@@ -427,6 +427,5 @@ def tensor_basis_kernel():
 	return tf.stack(basis, axis=-1)
 
 def init_training(ca, learning_rate=1.0e-3):
-	ca.model.summary()
 	training = Training(ca=ca, learning_rate=learning_rate)
 	return training
