@@ -1,4 +1,6 @@
 import module1 as lib
+import matplotlib
+import matplotlib.pyplot as plt
 from typing import Dict
 
 # Try different placements of nucleation sites around an image.
@@ -58,3 +60,24 @@ def experiment() -> Results:
 				res[des] = trial(des)
 				save_results(res)
 	return res
+
+def analysis():
+	data = []
+	with open("nucleation_results.csv", 'r') as f:
+		row = []
+		trial_set = []
+		for line in f.readlines()[1:]:
+			min_loss = float(line.split(',')[3])
+			trial_set.append(min_loss)
+			if len(trial_set) == NUM_TRIALS:
+				avg_loss = sum(trial_set) / NUM_TRIALS
+				row.append(avg_loss)
+				if len(row) == NUM_TEST_POINTS:
+					data.append(row)
+					row = []
+				trial_set = []
+	
+	plt.imshow(data)
+	plt.colorbar()
+	plt.savefig("nucleation_placement_plot.png")
+	plt.show()
