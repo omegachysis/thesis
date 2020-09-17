@@ -9,8 +9,8 @@ from typing import Dict
 IMG_SIZE = 16
 LIFETIME = 32
 TRIAL_SECONDS = 30
-NUM_TRIALS = 10
-NUM_TEST_POINTS = 8
+NUM_TRIALS = 1
+NUM_TEST_POINTS = 3
 
 class TrialDescription:
 	trial_num: int
@@ -29,7 +29,7 @@ def trial(trial: TrialDescription) -> lib.Training:
 	
 	x0 = lambda: ca.pointfilled(
 		ca.constfilled(1.0), point_value=0.0, pos=(trial.nucleation_x, trial.nucleation_y))
-	xf = lambda: ca.imagefilled("lenna.png")
+	xf = lambda: ca.imagefilled("lenna_circle.png")
 
 	training = lib.init_training(ca, learning_rate=2.0e-3)
 	training.run(x0, xf, lifetime=LIFETIME, max_seconds=TRIAL_SECONDS, lock_release=LIFETIME//2)
