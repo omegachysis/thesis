@@ -357,9 +357,11 @@ class Training(object):
 		max_plateau_len=None, lock_release=None, loss_f=None):
 		if self.is_done(): return
 
-		initial = result = loss = None
+		initial = loss = None
 		start = time.time()
 		elapsed_seconds = 0.0
+		def show_elapsed_time():
+			print("Time: ", elapsed_seconds, "seconds")
 
 		best_loss = None
 		plateau = 0
@@ -369,18 +371,22 @@ class Training(object):
 			if max_steps is not None:
 				if num_steps >= max_steps: 
 					print("Stopping due to max steps reached")
+					show_elapsed_time()
 					return
 			if max_seconds is not None:
 				if elapsed_seconds >= max_seconds: 
 					print("Stopping due to time-out")
+					show_elapsed_time()
 					return
 			if target_loss is not None:
 				if self.loss_hist and self.loss_hist[-1] <= target_loss: 
 					print("Stopping due to target loss reached")
+					show_elapsed_time()
 					return
 			if max_plateau_len is not None:
 				if plateau >= max_plateau_len:
 					print("Stopping due to plateau")
+					show_elapsed_time()
 					return
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
@@ -398,6 +404,7 @@ class Training(object):
 			num_steps += 1
 			if self.is_done(): 
 				print("Stopping due to zero loss")
+				show_elapsed_time()
 				return
 					
 	def save(self, name, sample_run_xs):
