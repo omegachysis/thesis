@@ -1,2 +1,2 @@
-model_checkpoint_path: "value_weight_maps_weights"
-all_model_checkpoint_paths: "value_weight_maps_weights"
+model_checkpoint_path: "9,0.875,0.875_weights"
+all_model_checkpoint_paths: "9,0.875,0.875_weights"
