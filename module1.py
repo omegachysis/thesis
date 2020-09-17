@@ -385,7 +385,7 @@ class Training(object):
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
 			target = np.repeat(xf()[None, ...], 1, 0) if xf is not None else None
-			x, loss = self.train_step(initial, target, lifetime, lock_release, loss_f)
+			_, loss = self.train_step(initial, target, lifetime, lock_release, loss_f)
 			if best_loss is None or loss.numpy() < best_loss:
 				best_loss = loss.numpy()
 				plateau = 0
