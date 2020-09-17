@@ -6,11 +6,11 @@ from typing import Dict
 # Try different placements of nucleation sites around an image.
 # This is to see if the local complexity of the image might have something 
 # to do with how well the nucleation site works.
-IMG_SIZE = 16
-LIFETIME = 32
-TRIAL_SECONDS = 30
+IMG_SIZE = 24
+LIFETIME = 40
+TRIAL_SECONDS = 60
 NUM_TRIALS = 1
-NUM_TEST_POINTS = 3
+NUM_TEST_POINTS = 4
 
 class TrialDescription:
 	trial_num: int
@@ -25,13 +25,13 @@ def trial(trial: TrialDescription) -> lib.Training:
 	ca = lib.CellularAutomata(
 		img_size=IMG_SIZE, channel_count=6, layer_counts=[64],
 		perception_kernel=lib.sobel_state_kernel())
-	ca.edge_strategy = lib.EdgeStrategy.MIRROR
+	ca.edge_strategy = lib.EdgeStrategy.TORUS
 	
 	x0 = lambda: ca.pointfilled(
 		ca.constfilled(1.0), point_value=0.0, pos=(trial.nucleation_x, trial.nucleation_y))
 	xf = lambda: ca.imagefilled("lenna_circle.png")
 
-	training = lib.init_training(ca, learning_rate=2.0e-3)
+	training = lib.init_training(ca, learning_rate=1.0e-3)
 	training.run(x0, xf, lifetime=LIFETIME, max_seconds=TRIAL_SECONDS, lock_release=LIFETIME//2)
 	xs = training.show_sample_run(x0, xf, lifetime=LIFETIME, lock_release=LIFETIME//2)
 	training.show_loss_history()
