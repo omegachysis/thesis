@@ -249,10 +249,7 @@ class CellularAutomata(tf.keras.Model):
 		for dim in range(2):
 				rgb_array = np.repeat(rgb_array, scale, dim)
 
-		out = io.BytesIO()
 		return PIL.Image.fromarray(rgb_array)
-		PIL.Image.fromarray(rgb_array).save(out, 'png')
-		return IPython.display.Image(data=out.getvalue())
 	
 	def create_gif(self, xs, scale=None):
 		if scale is None:
@@ -399,7 +396,7 @@ class Training(object):
 			elapsed_seconds = time.time() - start
 			num_steps += 1
 
-			wandb.log(dict(loss=loss.numpy()))
+			wandb.log(dict(loss=loss.numpy()), step=len(self.loss_hist))
 
 			if self.is_done(): 
 				print("Stopping due to zero loss")
@@ -436,26 +433,29 @@ def init_training(ca, learning_rate=1.0e-3):
 	training = Training(ca=ca, learning_rate=learning_rate)
 	return training
 
-class StateBuilder:
-	@staticmethod
-	def zero_everywhere(ca: CellularAutomata):
-		return ca.constfilled(0.0)
-	@staticmethod
-	def image(filename: str):
-		def f(ca: CellularAutomata):
-			return ca.imagefilled(filename)
-		return f
+
+def sconf_zero_everywhere(ca: CellularAutomata):
+	return ca.constfilled(0.0)
+
+def sconf_image(filename: str):
+	def f(ca: CellularAutomata):
+		return ca.imagefilled(filename)
+	return f
+
+def sconf_center_black_dot(ca: CellularAutomata):
+	return ca.pointfilled(ca.constfilled(1.0), point_value=0.0)
 
 class Config(object):
 	def __init__(self):
 		self.size = 16
-		self.channel_count = 3
+		self.num_channels = 3
 		self.layer1_size = 64
 		self.learning_rate = 1.0e-3
 		self.training_seconds = 30
-		self.edge_strategy = 'EdgeStrategy.TORUS'
-		self.initial_state = 'StateBuilder.zero_everywhere'
-		self.target_state = 'StateBuilder.image("lenna.png")'
+		self.num_sample_runs = 5
+		self.edge_strategy = 'EdgeStrategy.MIRROR'
+		self.initial_state = 'sconf_center_black_dot'
+		self.target_state = 'sconf_image("lenna.png")'
 		self.lifetime = 25
 
 def run_once(group: str, config: Config) -> None:
@@ -464,7 +464,7 @@ def run_once(group: str, config: Config) -> None:
 	layer_counts = []
 	if config.layer1_size: layer_counts.append(config.layer1_size)
 
-	ca = CellularAutomata(img_size=config.size, channel_count=config.channel_count,
+	ca = CellularAutomata(img_size=config.size, channel_count=config.num_channels,
 		layer_counts=layer_counts, perception_kernel=sobel_state_kernel())
 	ca.edge_strategy = eval(config.edge_strategy)
 	training = Training(ca=ca, learning_rate=config.learning_rate)
@@ -473,8 +473,23 @@ def run_once(group: str, config: Config) -> None:
 	xf = eval(config.target_state)(ca)
 	x0_fn = lambda: x0
 	xf_fn = lambda: xf
-	training.run(x0_fn, xf_fn, config.lifetime, max_seconds=config.training_seconds)
-	ca.model.save(os.path.join(wandb.run.dir, "model.h5"))
+
+	interval_seconds = config.training_seconds / config.num_sample_runs
+
+	for i in range(config.num_sample_runs):
+		training.run(x0_fn, xf_fn, config.lifetime, max_seconds=interval_seconds)
+		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
+
+		# Save a sample run:
+		sample_run = training.do_sample_run(x0_fn, xf_fn, config.lifetime)
+		gif_path = f"temp/sample_run_{i}.gif"
+		with open(gif_path, 'wb') as gif:
+			gif.write(ca.create_gif(sample_run))
+		final_img = ca.to_image(sample_run[-1])
+		wandb.log({
+			f"final_state": wandb.Image(final_img),
+			f"video": wandb.Video(gif_path)},
+			step=len(training.loss_hist))
 
 test_config = Config()
-test_config.training_seconds = 5
+test_config.training_seconds = 10
