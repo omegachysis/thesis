@@ -1,14 +1,12 @@
 import os
 import tensorflow as tf
-from tensorflow import keras
 import numpy as np
 import PIL.Image
 import IPython.display
 import math
 import io
-import random
 import time
-import statistics as stats
+import wandb
 from matplotlib import pyplot as plt
 from typing import List
 
@@ -64,16 +62,15 @@ class CellularAutomata(tf.keras.Model):
 			repeats=self.channel_count, axis=2)
 		self.perception_kernel = perception_kernel
 
-		perception_input = tf.keras.layers.Input(
-			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1]))
-		curr_layer = perception_input
+		# Build the model:
+		self.model = tf.keras.Sequential()
+		self.model.add(tf.keras.layers.Input(
+			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1])))
 		for layer_count in layer_counts:
-			curr_layer = tf.keras.layers.Conv2D(filters=layer_count, kernel_size=1,
-				activation=tf.nn.relu)(curr_layer)
-		output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
-			activation=None, kernel_initializer=tf.zeros_initializer)(curr_layer)
-
-		self.model = tf.keras.Model(inputs=[perception_input], outputs=output_layer)
+			self.model.add(tf.keras.layers.Conv2D(
+				filters=layer_count, kernel_size=1, activation=tf.nn.relu))
+		self.model.add(tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
+			activation=None, kernel_initializer=tf.zeros_initializer()))
 
 	def laplacian(self, x):
 		Δ = tf.reshape(tf.constant([
@@ -400,8 +397,10 @@ class Training(object):
 
 			self.loss_hist.append(loss.numpy())
 			elapsed_seconds = time.time() - start
-			
 			num_steps += 1
+
+			wandb.log(dict(loss=loss.numpy()))
+
 			if self.is_done(): 
 				print("Stopping due to zero loss")
 				show_elapsed_time()
@@ -436,3 +435,46 @@ def tensor_basis_kernel():
 def init_training(ca, learning_rate=1.0e-3):
 	training = Training(ca=ca, learning_rate=learning_rate)
 	return training
+
+class StateBuilder:
+	@staticmethod
+	def zero_everywhere(ca: CellularAutomata):
+		return ca.constfilled(0.0)
+	@staticmethod
+	def image(filename: str):
+		def f(ca: CellularAutomata):
+			return ca.imagefilled(filename)
+		return f
+
+class Config(object):
+	def __init__(self):
+		self.size = 16
+		self.channel_count = 3
+		self.layer1_size = 64
+		self.learning_rate = 1.0e-3
+		self.training_seconds = 30
+		self.edge_strategy = 'EdgeStrategy.TORUS'
+		self.initial_state = 'StateBuilder.zero_everywhere'
+		self.target_state = 'StateBuilder.image("lenna.png")'
+		self.lifetime = 25
+
+def run_once(group: str, config: Config) -> None:
+	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
+
+	layer_counts = []
+	if config.layer1_size: layer_counts.append(config.layer1_size)
+
+	ca = CellularAutomata(img_size=config.size, channel_count=config.channel_count,
+		layer_counts=layer_counts, perception_kernel=sobel_state_kernel())
+	ca.edge_strategy = eval(config.edge_strategy)
+	training = Training(ca=ca, learning_rate=config.learning_rate)
+
+	x0 = eval(config.initial_state)(ca)
+	xf = eval(config.target_state)(ca)
+	x0_fn = lambda: x0
+	xf_fn = lambda: xf
+	training.run(x0_fn, xf_fn, config.lifetime, max_seconds=config.training_seconds)
+	ca.model.save(os.path.join(wandb.run.dir, "model.h5"))
+
+test_config = Config()
+test_config.training_seconds = 5
