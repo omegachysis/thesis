@@ -451,6 +451,7 @@ class Config(object):
 		self.size = 16
 		self.num_channels = 3
 		self.layer1_size = 64
+		self.layer2_size = 0
 		self.learning_rate = 1.0e-3
 		self.training_seconds = 30
 		self.num_sample_runs = 5
@@ -460,11 +461,12 @@ class Config(object):
 		self.lifetime = 25
 
 	def randomized(self):
-		self.size = random.randrange(4,40)
-		self.num_channels = random.randrange(1,5) * 3
-		self.layer1_size = random.randrange(4,256)
-		self.learning_rate = random.random() * 0.01 + 0.001
-		self.lifetime = random.randrange(8,80)
+		self.size = random.randrange(20,60)
+		self.num_channels = random.randrange(1,4) * 3
+		self.layer1_size = random.randrange(10,40)
+		self.layer2_size = random.randrange(10,40)
+		self.learning_rate = random.random() * 0.001 + 0.002
+		self.lifetime = self.size + random.randrange(self.size)
 		return self
 
 def run_once(group: str, config: Config) -> None:
@@ -472,6 +474,7 @@ def run_once(group: str, config: Config) -> None:
 
 	layer_counts = []
 	if config.layer1_size: layer_counts.append(config.layer1_size)
+	if config.layer2_size: layer_counts.append(config.layer2_size)
 
 	ca = CellularAutomata(img_size=config.size, channel_count=config.num_channels,
 		layer_counts=layer_counts, perception_kernel=sobel_state_kernel())
@@ -485,8 +488,10 @@ def run_once(group: str, config: Config) -> None:
 
 	interval_seconds = config.training_seconds / config.num_sample_runs
 
+	best_loss = 999
 	for i in range(config.num_sample_runs):
 		training.run(x0_fn, xf_fn, config.lifetime, max_seconds=interval_seconds)
+
 		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
 
 		# Save a sample run:
@@ -499,6 +504,14 @@ def run_once(group: str, config: Config) -> None:
 			f"final_state": wandb.Image(final_img),
 			f"video": wandb.Video(gif_path)},
 			step=len(training.loss_hist))
+		
+		best_so_far = min(training.loss_hist)
+		print("Best loss: ", best_so_far)
+		if best_so_far < best_loss:
+			best_loss = best_so_far
+		else:
+			print("Stopping early due to loss plateau...")
+			break
 
 test_config = Config()
 test_config.training_seconds = 10
