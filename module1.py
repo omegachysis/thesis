@@ -6,6 +6,7 @@ import IPython.display
 import math
 import io
 import time
+import random
 import wandb
 from matplotlib import pyplot as plt
 from typing import List
@@ -458,6 +459,14 @@ class Config(object):
 		self.target_state = 'sconf_image("lenna.png")'
 		self.lifetime = 25
 
+	def randomized(self):
+		self.size = random.randrange(4,40)
+		self.num_channels = random.randrange(1,5) * 3
+		self.layer1_size = random.randrange(4,256)
+		self.learning_rate = random.random() * 0.01 + 0.001
+		self.lifetime = random.randrange(8,80)
+		return self
+
 def run_once(group: str, config: Config) -> None:
 	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
@@ -493,3 +502,9 @@ def run_once(group: str, config: Config) -> None:
 
 test_config = Config()
 test_config.training_seconds = 10
+
+def compare_learning_rates(group: str) -> None:
+	config = Config()
+	for x in np.linspace(0.0025, 0.0040, num=30):
+		config.learning_rate = x
+		run_once(group, config)
