@@ -1,2 +1,0 @@
-model_checkpoint_path: "0,0.75,0.75_weights"
-all_model_checkpoint_paths: "0,0.75,0.75_weights"
