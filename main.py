@@ -25,7 +25,6 @@ def run_once(group: str, config: Config) -> None:
 
 	interval_seconds = config.training_seconds / config.num_sample_runs
 
-	best_loss = 999
 	for i in range(config.num_sample_runs):
 		training.run(x0_fn, xf_fn, config.lifetime, loss_fn, max_seconds=interval_seconds)
 
@@ -44,11 +43,6 @@ def run_once(group: str, config: Config) -> None:
 		
 		best_so_far = min(training.loss_hist)
 		print("Best loss: ", best_so_far)
-		if best_so_far < best_loss:
-			best_loss = best_so_far
-		else:
-			print("Stopping early due to loss plateau...")
-			break
 
 def main():
 	config = Config()
