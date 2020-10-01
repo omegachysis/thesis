@@ -25,7 +25,7 @@ class CellularAutomata(tf.keras.Model):
 		self.noise_range = (0.0, 0.0)
 		self.noise_mask = None
 		self.noise_replace = False
-		self.clamp_values = True
+		self.clamp_values = False
 		self.edge_strategy = EdgeStrategy.TF_SAME
 		self.lock_map = None
 
@@ -114,9 +114,6 @@ class CellularAutomata(tf.keras.Model):
 
 		return conv
 
-	def get_mass(self, x):
-		return tf.reduce_sum(x, axis=[0,1])
-
 	@tf.function
 	def call(self, x, lock_release):
 		s = self.perceive(x)
@@ -140,6 +137,8 @@ class CellularAutomata(tf.keras.Model):
 			else:
 				x += noise_val * noise_len + self.noise_range[0]
 				
+		if self.clamp_values:
+			x = tf.clip_by_value(x, 0., 1.)
 		return x
 	
 	def imagefilled(self, image_path):

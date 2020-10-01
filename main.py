@@ -15,6 +15,7 @@ def run_once(group: str, config: Config) -> None:
 	ca = CellularAutomata(img_size=config.size, channel_count=config.num_channels,
 		layer_counts=layer_counts, perception_kernel=kernel_sobel())
 	ca.edge_strategy = eval(config.edge_strategy)
+	ca.clamp_values = config.clamp_values
 	training = Training(ca=ca, config=config)
 
 	x0 = eval(config.initial_state)(ca)
