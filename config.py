@@ -27,6 +27,9 @@ def kernel_neighbors():
 def sconf_zero_everywhere(ca: CellularAutomata):
 	return ca.constfilled(0.0)
 
+def sconf_one_everywhere(ca: CellularAutomata):
+	return ca.constfilled(1.0)
+
 def sconf_image(filename: str):
 	def f(ca: CellularAutomata):
 		return ca.imagefilled("images/" + filename)
@@ -39,31 +42,41 @@ def sconf_center_black_dot(ca: CellularAutomata):
 
 def loss_mse(target):
 	def f(x):
-		return tf.reduce_mean(tf.square(x[...,:3] - target[...,:3]))
+		a = x[..., :3] #tf.clip_by_value(x[...,:3], 0., 1.)
+		b = target[..., :3] #tf.clip_by_value(target[...,:3], 0., 1.)
+		return tf.reduce_mean(tf.square(a - b))
 	return f
+
+def loss_laplacian(target):
+	target = target[None, ...]
+	def f(x):
+		lx = CellularAutomata.laplacian(x)
+		lt = CellularAutomata.laplacian(target)
+		return tf.reduce_mean(tf.square(lx[...,:3] - lt[...,:3]))
+	return f
+
+def loss_combined(loss1, loss2):
+	def res(target):
+		l1 = loss1(target)
+		l2 = loss2(target)
+		def f(x): return l1(x) + l2(x)
+		return f
+	return res
 
 # --------------------------------------------------------------------
 
 class Config(object):
 	def __init__(self):
-		self.size = 16
-		self.num_channels = 3
+		self.size = 25
+		self.num_channels = 15
 		self.layer1_size = 64
 		self.layer2_size = 0
 		self.learning_rate = 3.0e-3
-		self.training_seconds = 30
+		self.epsilon = 1.0e-3
+		self.training_seconds = 60
 		self.num_sample_runs = 5
-		self.edge_strategy = 'EdgeStrategy.MIRROR'
+		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_center_black_dot'
 		self.target_state = 'sconf_image("lenna.png")'
 		self.loss_fn = 'loss_mse'
-		self.lifetime = 25
-
-	def randomized(self):
-		self.size = random.randrange(20,60)
-		self.num_channels = random.randrange(1,3) * 3
-		self.layer1_size = random.randrange(5,64)
-		self.layer2_size = random.randrange(5,64)
-		self.learning_rate = random.random() * 0.001 + 0.001
-		self.lifetime = self.size + random.randrange(self.size)
-		return self
+		self.lifetime = 50

@@ -1,3 +1,4 @@
+from config import Config
 from urllib.parse import non_hierarchical
 import tensorflow as tf
 import numpy as np
@@ -6,17 +7,11 @@ import wandb
 from matplotlib import pyplot as plt
 
 class Training(object):
-	def __init__(self, ca, learning_rate):
+	def __init__(self, ca, config: Config):
 		self.ca = ca
 		self.loss_hist = []
-		self.learning_rate = learning_rate
-		self.lr_sched = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
-			boundaries = [2000], 
-			values = [self.learning_rate, self.learning_rate * 0.1])
-		self.trainer = tf.keras.optimizers.Adam(self.lr_sched)
-
-	def get_sum(self, x):
-		return tf.reduce_sum(x)
+		self.trainer = tf.keras.optimizers.Adam(config.learning_rate,
+			epsilon=config.epsilon)
 
 	@tf.function
 	def train_step(self, x0, xf, lifetime, loss_fn, lock_release: int=None):
@@ -24,7 +19,7 @@ class Training(object):
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
 				x = self.ca(x, lock_release is not None and i >= lock_release)
-			loss = loss_fn(x)
+			loss = tf.reduce_mean(loss_fn(x))
 				
 		grads = g.gradient(loss, self.ca.weights)
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]

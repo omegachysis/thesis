@@ -15,7 +15,7 @@ def run_once(group: str, config: Config) -> None:
 	ca = CellularAutomata(img_size=config.size, channel_count=config.num_channels,
 		layer_counts=layer_counts, perception_kernel=kernel_sobel())
 	ca.edge_strategy = eval(config.edge_strategy)
-	training = Training(ca=ca, learning_rate=config.learning_rate)
+	training = Training(ca=ca, config=config)
 
 	x0 = eval(config.initial_state)(ca)
 	xf = eval(config.target_state)(ca)
@@ -46,4 +46,4 @@ def run_once(group: str, config: Config) -> None:
 
 def main():
 	config = Config()
-	run_once("refactored_1", config)
+	run_once("tryfix_1", config)

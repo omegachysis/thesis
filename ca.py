@@ -47,15 +47,17 @@ class CellularAutomata(tf.keras.Model):
 		self.model.add(tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
 			activation=None, kernel_initializer=tf.zeros_initializer()))
 
-	def laplacian(self, x):
+	@staticmethod
+	def laplacian(x):
 		Δ = tf.reshape(tf.constant([
 				[1/4, 1/2, 1/4],
 				[1/2, -3,  1/2],
 				[1/4, 1/2, 1/4]
 		]), shape=[3,3,1])
 		Δ = Δ[:,:,None,:]
-		Δ = tf.repeat(Δ, repeats=self.channel_count, axis=2)
-		Δx = tf.nn.depthwise_conv2d(x[None,...], Δ, strides=[1,1,1,1], padding="SAME")[0]
+		channel_count = x.shape[3]
+		Δ = tf.repeat(Δ, repeats=channel_count, axis=2)
+		Δx = tf.nn.depthwise_conv2d(x, Δ, strides=[1,1,1,1], padding="SAME")[0]
 		return Δx
 
 	def pad_repeat(self, tensor):
@@ -125,13 +127,6 @@ class CellularAutomata(tf.keras.Model):
 		else:
 			x += dx
 
-		x = tf.clip_by_value(x, 0.0, 1.0)
-
-		if self.conserved_mass is not None:
-			new_mass = tf.reduce_sum(x, [1,2])
-			x *= (self.conserved_mass + 1e-10) / (new_mass + 1e-10)
-			x = tf.clip_by_value(x, 0.0, 1.0)
-
 		if self.noise_range is not None:
 			# Add random noise.
 			noise_len = self.noise_range[1] - self.noise_range[0]
@@ -144,8 +139,6 @@ class CellularAutomata(tf.keras.Model):
 					noise_val * noise_len + self.noise_range[0]
 			else:
 				x += noise_val * noise_len + self.noise_range[0]
-			# Keep random noise or changes in dx from causing out-of-range values.
-			x = tf.clip_by_value(x, 0.0, 1.0)
 				
 		return x
 	
