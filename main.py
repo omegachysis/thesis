@@ -46,5 +46,8 @@ def run_once(group: str, config: Config) -> None:
 		print("Best loss: ", best_so_far)
 
 def main():
-	config = Config()
-	run_once("tryfix_1", config)
+	for x in [0,4,8,16,32,64,128,256,512,1024]:
+		config = Config()
+		config.training_seconds = 120
+		config.layer2_size = x
+		run_once("hyperparams_3", config)

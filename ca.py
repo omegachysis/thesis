@@ -207,38 +207,29 @@ class CellularAutomata(tf.keras.Model):
 		arr = np.zeros((self.img_size, self.img_size * hsize, 3))
 		# Fill the image array with the RGB images generated from the 
 		# state in RGB and the hidden channels in groups of 3.
-		for i in range(hsize):
-			arr[:, self.img_size*i : self.img_size*(i+1), :] = x[..., i*3 : (i+1)*3]
+		for i in range(self.channel_count):
+			arr[:, self.img_size*(i//3) : self.img_size*(i//3+1), i%3] = x[..., i]
 
 		rgb_array = np.uint8(arr * 255.0)
-
-		# Scale the first two dimensions of the image by the given scale.
 		for dim in range(2):
 				rgb_array = np.repeat(rgb_array, scale, dim)
-
 		return PIL.Image.fromarray(rgb_array)
 	
-	def create_gif(self, xs, scale=None):
-		if scale is None:
-			scale = 128 // self.img_size
-				
+	def create_gif(self, xs):
 		out = io.BytesIO()
-		imgs = [self.to_image(x, scale) for x in xs]
-		durs = [50 for img in imgs]
+		imgs = [self.to_image(x, scale=3) for x in xs]
+		durs = [50 for _ in imgs]
 		durs[0] = 500
 		durs[-1] = 500
 		imgs[0].save(out, 'gif', save_all=True, append_images=imgs[1:], loop=0, duration=durs)
 		return out.getvalue()
 		
-	def display_gif(self, xs, scale=None):
-		img = IPython.display.Image(data=self.create_gif(xs, scale))
+	def display_gif(self, xs):
+		img = IPython.display.Image(data=self.create_gif(xs))
 		IPython.display.display(img)
 
-	def display(self, x, scale=None):
-		if scale is None:
-			scale = 64 // self.img_size
-				
+	def display(self, x):
 		out = io.BytesIO()
-		self.to_image(x, scale).save(out, 'png')
+		self.to_image(x).save(out, 'png')
 		img = IPython.display.Image(data=out.getvalue())
 		IPython.display.display(img)

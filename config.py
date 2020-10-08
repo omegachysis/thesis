@@ -67,17 +67,17 @@ def loss_combined(loss1, loss2):
 
 class Config(object):
 	def __init__(self):
-		self.size = 64
-		self.num_channels = 15
+		self.size = 24
+		self.num_channels = 12
 		self.layer1_size = 256
 		self.layer2_size = 0
 		self.learning_rate = 3.0e-3
 		self.epsilon = 1.0e-6
-		self.training_seconds = 60 * 4
-		self.num_sample_runs = 8
+		self.training_seconds = 60
+		self.num_sample_runs = 5
 		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_center_black_dot'
 		self.target_state = 'sconf_image("lenna.png")'
 		self.loss_fn = 'loss_mse'
-		self.lifetime = 64
+		self.lifetime = 50
 		self.clamp_values = False
