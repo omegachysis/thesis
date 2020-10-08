@@ -50,12 +50,13 @@ def run_once(group: str, config: Config) -> None:
 			break
 
 def main():
-	config = Config()
-	config.layer1_size = 256
-	config.training_seconds = 600
-	config.num_sample_runs = 600 // 30
-	config.target_loss = 0.02
-	config.size = 32
-	config.target_state = 'sconf_image("lenna.png")'
-	config.loss_fn = 'loss_rmse'
-	run_once("image_slices_1", config)
+	for _ in range(10):
+		config = Config()
+		config.layer1_size = 256
+		config.training_seconds = 600
+		config.num_sample_runs = 600 // 30
+		config.target_loss = 0.025
+		config.size = 16
+		config.target_state = 'sconf_image("lenna4.png")'
+		config.loss_fn = 'loss_rmse'
+		run_once("image_slices_2", config)
