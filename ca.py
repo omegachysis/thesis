@@ -213,8 +213,9 @@ class CellularAutomata(tf.keras.Model):
 				# Hidden channel, scale to fit color space.
 				a = np.min(s)
 				b = np.max(s)
+				ba = max(1.0, b-a)
 				s -= a
-				s *= 1/(b-a)
+				s *= 1/ba
 			arr[:, self.img_size*(i//3) : self.img_size*(i//3+1), i%3] = s
 
 		rgb_array = np.uint8(arr * 255.0)

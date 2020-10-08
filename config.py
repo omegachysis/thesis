@@ -85,8 +85,8 @@ class Config(object):
 		self.num_channels = 12
 		self.layer1_size = 256
 		self.layer2_size = 0
-		self.learning_rate = 3.0e-3
-		self.epsilon = 1.0e-6
+		self.learning_rate = 3.5e-3
+		self.epsilon = 1.0e-5
 		self.training_seconds = 60
 		self.num_sample_runs = 5
 		self.edge_strategy = 'EdgeStrategy.ZEROS'

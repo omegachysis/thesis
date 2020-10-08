@@ -54,6 +54,8 @@ def main():
 	config.layer1_size = 256
 	config.training_seconds = 600
 	config.num_sample_runs = 600 // 30
-	config.target_loss = 0.01
+	config.target_loss = 0.02
+	config.size = 32
+	config.target_state = 'sconf_image("lenna.png")'
 	config.loss_fn = 'loss_rmse'
-	run_once("temp", config)
+	run_once("image_slices_1", config)
