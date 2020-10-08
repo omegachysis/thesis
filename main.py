@@ -45,9 +45,15 @@ def run_once(group: str, config: Config) -> None:
 		best_so_far = min(training.loss_hist)
 		print("Best loss: ", best_so_far)
 
+		if training.is_done():
+			print("Target loss reached, ending...")
+			break
+
 def main():
-	for x in [0,4,8,16,32,64,128,256,512,1024]:
-		config = Config()
-		config.training_seconds = 120
-		config.layer2_size = x
-		run_once("hyperparams_3", config)
+	config = Config()
+	config.layer1_size = 256
+	config.training_seconds = 600
+	config.num_sample_runs = 600 // 30
+	config.target_loss = 0.01
+	config.loss_fn = 'loss_rmse'
+	run_once("temp", config)

@@ -12,6 +12,7 @@ class Training(object):
 		self.loss_hist = []
 		self.trainer = tf.keras.optimizers.Adam(config.learning_rate,
 			epsilon=config.epsilon)
+		self.target_loss = config.target_loss
 
 	@tf.function
 	def train_step(self, x0, xf, lifetime, loss_fn, lock_release: int=None):
@@ -66,8 +67,7 @@ class Training(object):
 			plt.show()
 
 	def is_done(self):
-		return self.loss_hist and \
-			self.loss_hist[-1] * self.ca.img_size * self.ca.img_size * 3 <= 0.001
+		return self.loss_hist and self.loss_hist[-1] <= self.target_loss
 	
 	def run(self, x0, xf, lifetime: int, loss_fn, max_seconds=None, max_plateau_len=None):
 		if self.is_done(): return

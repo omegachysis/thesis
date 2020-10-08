@@ -208,7 +208,14 @@ class CellularAutomata(tf.keras.Model):
 		# Fill the image array with the RGB images generated from the 
 		# state in RGB and the hidden channels in groups of 3.
 		for i in range(self.channel_count):
-			arr[:, self.img_size*(i//3) : self.img_size*(i//3+1), i%3] = x[..., i]
+			s = x[..., i]
+			if i >= 3:
+				# Hidden channel, scale to fit color space.
+				a = np.min(s)
+				b = np.max(s)
+				s -= a
+				s *= 1/(b-a)
+			arr[:, self.img_size*(i//3) : self.img_size*(i//3+1), i%3] = s
 
 		rgb_array = np.uint8(arr * 255.0)
 		for dim in range(2):

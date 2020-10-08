@@ -42,9 +42,23 @@ def sconf_center_black_dot(ca: CellularAutomata):
 
 def loss_mse(target):
 	def f(x):
-		a = x[..., :3] #tf.clip_by_value(x[...,:3], 0., 1.)
-		b = target[..., :3] #tf.clip_by_value(target[...,:3], 0., 1.)
+		a = x[..., :3]
+		b = target[..., :3]
 		return tf.reduce_mean(tf.square(a - b))
+	return f
+
+def loss_rmse(target):
+	def f(x):
+		a = x[..., :3]
+		b = target[..., :3]
+		return tf.pow(tf.reduce_mean(tf.square(a - b)), 0.5)
+	return f
+	
+def loss_mae(target):
+	def f(x):
+		a = x[..., :3]
+		b = target[..., :3]
+		return tf.reduce_mean(tf.abs(a - b))
 	return f
 
 def loss_laplacian(target):
@@ -67,7 +81,7 @@ def loss_combined(loss1, loss2):
 
 class Config(object):
 	def __init__(self):
-		self.size = 24
+		self.size = 32
 		self.num_channels = 12
 		self.layer1_size = 256
 		self.layer2_size = 0
@@ -78,6 +92,7 @@ class Config(object):
 		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_center_black_dot'
 		self.target_state = 'sconf_image("lenna.png")'
-		self.loss_fn = 'loss_mse'
-		self.lifetime = 50
+		self.loss_fn = 'loss_rmse'
+		self.lifetime = 64
 		self.clamp_values = False
+		self.target_loss = 0.0
