@@ -37,15 +37,24 @@ class CellularAutomata(tf.keras.Model):
 			repeats=self.channel_count, axis=2)
 		self.perception_kernel = perception_kernel
 
-		# Build the model:
-		self.model = tf.keras.Sequential()
-		self.model.add(tf.keras.layers.Input(
-			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1])))
+		# Create the input layer.
+		inputs = tf.keras.Input(
+			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1]), 
+			dtype=tf.float32)
+		
+		# Add a convolutional layer for each of the layer counts specified in the config.
+		curr_inputs = inputs
 		for layer_count in layer_counts:
-			self.model.add(tf.keras.layers.Conv2D(
-				filters=layer_count, kernel_size=1, activation=tf.nn.relu))
-		self.model.add(tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
-			activation=None, kernel_initializer=tf.zeros_initializer()))
+			conv_layer = tf.keras.layers.Conv2D(
+				filters=layer_count, kernel_size=1, activation=tf.nn.relu)
+			curr_inputs = conv_layer(curr_inputs)
+
+		# Create the output layer.
+		output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
+			activation=None, kernel_initializer=tf.zeros_initializer())
+		outputs = output_layer(curr_inputs)
+
+		self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
 	@staticmethod
 	def laplacian(x):
