@@ -53,6 +53,8 @@ def run_once(group: str, config: Config) -> None:
 def main():
 	for _ in range(1):
 		config = Config()
+		config.num_subnetworks = 2
+		config.combiner_layer_size = 64
 		config.layer1_size = 128
 		config.training_seconds = 60
 		config.num_sample_runs = 5

@@ -44,8 +44,8 @@ class CellularAutomata(tf.keras.Model):
 			dtype=tf.float32)
 		
 		# Create sub-networks and sub-models.
-		self.submodels = []
-		suboutputs = []
+		self.submodels: List[tf.keras.Model] = []
+		suboutputs = [inputs]
 
 		for _ in range(num_subnetworks):
 			# Add a convolutional layer for each of the layer counts specified in the config.
@@ -69,12 +69,17 @@ class CellularAutomata(tf.keras.Model):
 		else:
 			# Else, combine together the subnetworks by adding a convolutional relu before 
 			# a final output.
-			combiner_layer = tf.keras.layers.Conv2D(
-				filters=combiner_layer_size, kernel_size=1, activation=tf.nn.relu)
-			combined_output = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
+			combined_outputs = tf.keras.layers.concatenate(suboutputs)
+			combiner_layer = tf.keras.layers.Conv2D(filters=combiner_layer_size, kernel_size=1,
+				activation=tf.nn.relu)
+			final_output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
 				activation=None, kernel_initializer=tf.zeros_initializer())
-			outputs = combined_output(combiner_layer(suboutputs))
+			outputs = final_output_layer(combiner_layer(combined_outputs))
 			self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
+
+	def load_into_submodel(self, submodel_idx: int, sub_ca):
+		model = self.submodels[submodel_idx]
+		model.set_weights(sub_ca.model.get_weights())
 
 	@staticmethod
 	def laplacian(x):
@@ -144,7 +149,7 @@ class CellularAutomata(tf.keras.Model):
 		return conv
 
 	@tf.function
-	def call(self, x, lock_release):
+	def call(self, x):
 		s = self.perceive(x)
 		dx = self.model(s)
 		x += dx

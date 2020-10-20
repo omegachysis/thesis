@@ -19,7 +19,8 @@ class Training(object):
 		x = x0
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
-				x = self.ca(x, lock_release is not None and i >= lock_release)
+				#x = self.ca(x, lock_release is not None and i >= lock_release)
+				x = self.ca(x)
 			loss = tf.reduce_mean(loss_fn(x))
 				
 		grads = g.gradient(loss, self.ca.weights)
@@ -34,7 +35,8 @@ class Training(object):
 		xs = []
 		xs.append(x[0, ...])
 		for i in range(lifetime):
-			x = self.ca(x, lock_release is not None and i >= lock_release)
+			#x = self.ca(x, lock_release is not None and i >= lock_release)
+			x = self.ca(x)
 			xs.append(x[0, ...])
 
 		return xs
