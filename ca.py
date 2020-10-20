@@ -16,7 +16,8 @@ class EdgeStrategy:
 
 class CellularAutomata(tf.keras.Model):
 	def __init__(self, img_size: int, 
-	channel_count: int, layer_counts: List[int], perception_kernel):
+	channel_count: int, layer_counts: List[int], perception_kernel, num_subnetworks: int,
+	combiner_layer_size: int):
 		super().__init__()
 
 		self.img_size = img_size
@@ -42,19 +43,38 @@ class CellularAutomata(tf.keras.Model):
 			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1]), 
 			dtype=tf.float32)
 		
-		# Add a convolutional layer for each of the layer counts specified in the config.
-		curr_inputs = inputs
-		for layer_count in layer_counts:
-			conv_layer = tf.keras.layers.Conv2D(
-				filters=layer_count, kernel_size=1, activation=tf.nn.relu)
-			curr_inputs = conv_layer(curr_inputs)
+		# Create sub-networks and sub-models.
+		self.submodels = []
+		suboutputs = []
 
-		# Create the output layer.
-		output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
-			activation=None, kernel_initializer=tf.zeros_initializer())
-		outputs = output_layer(curr_inputs)
+		for _ in range(num_subnetworks):
+			# Add a convolutional layer for each of the layer counts specified in the config.
+			curr_inputs = inputs
+			for layer_count in layer_counts:
+				conv_layer = tf.keras.layers.Conv2D(
+					filters=layer_count, kernel_size=1, activation=tf.nn.relu)
+				curr_inputs = conv_layer(curr_inputs)
 
-		self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
+			# Create the output layer.
+			output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
+				activation=None, kernel_initializer=tf.zeros_initializer())
+			outputs = output_layer(curr_inputs)
+
+			suboutputs.append(outputs)
+			self.submodels.append(tf.keras.Model(inputs=inputs, outputs=outputs))
+
+		# If there is only one subnetwork, just make the whole network the subnetwork:
+		if len(self.submodels) == 1:
+			self.model = self.submodels[0]
+		else:
+			# Else, combine together the subnetworks by adding a convolutional relu before 
+			# a final output.
+			combiner_layer = tf.keras.layers.Conv2D(
+				filters=combiner_layer_size, kernel_size=1, activation=tf.nn.relu)
+			combined_output = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
+				activation=None, kernel_initializer=tf.zeros_initializer())
+			outputs = combined_output(combiner_layer(suboutputs))
+			self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
 	@staticmethod
 	def laplacian(x):
@@ -127,27 +147,29 @@ class CellularAutomata(tf.keras.Model):
 	def call(self, x, lock_release):
 		s = self.perceive(x)
 		dx = self.model(s)
+		x += dx
+		
+		# if self.lock_map is not None and not lock_release:
+		# 	x += dx * self.lock_map
+		# else:
+		# 	x += dx
 
-		if self.lock_map is not None and not lock_release:
-			x += dx * self.lock_map
-		else:
-			x += dx
+		# if self.noise_range is not None:
+		# 	# Add random noise.
+		# 	noise_len = self.noise_range[1] - self.noise_range[0]
+		# 	noise_val = tf.cast(tf.random.uniform(tf.shape(x)), tf.float32)
+		# 	if self.noise_mask is not None:
+		# 		noise_val *= self.noise_mask
 
-		if self.noise_range is not None:
-			# Add random noise.
-			noise_len = self.noise_range[1] - self.noise_range[0]
-			noise_val = tf.cast(tf.random.uniform(tf.shape(x)), tf.float32)
-			if self.noise_mask is not None:
-				noise_val *= self.noise_mask
-
-			if self.noise_replace and self.noise_mask is not None:
-				x = x * (1.0-self.noise_mask) + \
-					noise_val * noise_len + self.noise_range[0]
-			else:
-				x += noise_val * noise_len + self.noise_range[0]
+		# 	if self.noise_replace and self.noise_mask is not None:
+		# 		x = x * (1.0-self.noise_mask) + \
+		# 			noise_val * noise_len + self.noise_range[0]
+		# 	else:
+		# 		x += noise_val * noise_len + self.noise_range[0]
 				
-		if self.clamp_values:
-			x = tf.clip_by_value(x, 0., 1.)
+		# if self.clamp_values:
+		# 	x = tf.clip_by_value(x, 0., 1.)
+
 		return x
 	
 	def imagefilled(self, image_path):

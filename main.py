@@ -13,7 +13,8 @@ def run_once(group: str, config: Config) -> None:
 	if config.layer2_size: layer_counts.append(config.layer2_size)
 
 	ca = CellularAutomata(img_size=config.size, channel_count=config.num_channels,
-		layer_counts=layer_counts, perception_kernel=kernel_sobel())
+		layer_counts=layer_counts, perception_kernel=kernel_sobel(),
+		num_subnetworks=config.num_subnetworks, combiner_layer_size=config.combiner_layer_size)
 	ca.edge_strategy = eval(config.edge_strategy)
 	ca.clamp_values = config.clamp_values
 	training = Training(ca=ca, config=config)
@@ -55,7 +56,7 @@ def main():
 		config.layer1_size = 128
 		config.training_seconds = 60
 		config.num_sample_runs = 5
-		config.size = 16
+		config.size = 25
 		config.target_state = 'sconf_image("lenna.png")'
 		config.loss_fn = 'loss_mse'
 		run_once("net_transfer", config)
