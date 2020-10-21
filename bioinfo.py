@@ -8,18 +8,18 @@ from training import *
 
 class BioConfig(object):
 	def __init__(self):
-		self.chain_len = 10
-		self.num_channels = 3
-		self.hidden_layer_size = 256
+		self.chain_len = 200
+		self.num_channels = 6
+		self.hidden_layer_size = 64
 		self.learning_rate = 3.5e-3
 		self.epsilon = 1.0e-5
 		self.training_seconds = 60
-		self.num_sample_runs = 5
+		self.num_sample_runs = 3
 		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_zero_everywhere'
-		self.target_state = 'sconf_one_everywhere'
+		self.target_state = 'sconf_random'
 		self.loss_fn = 'loss_mse'
-		self.lifetime = 64
+		self.lifetime = 200
 		self.clamp_values = False
 		self.target_loss = 0.0
 
@@ -75,6 +75,9 @@ class BioCa(tf.keras.Model):
 		x += dx
 		return x
 
+	def randomfilled(self):
+		return np.random.rand(1, self.chain_len, self.num_channels).astype(np.float32)
+
 	def constfilled(self, u):
 		""" Fills the world with u. """
 		return np.ones((1, self.chain_len, self.num_channels), dtype=np.float32) * u
@@ -93,7 +96,7 @@ class BioCa(tf.keras.Model):
 				ba = max(1.0, b-a)
 				s -= a
 				s *= 1/ba
-			arr[i:i+1, :, i%3] = s
+			arr[i//3, :, i%3] = s
 
 		rgb_array = np.uint8(arr * 255.0)
 		for dim in range(2):
@@ -121,6 +124,9 @@ def sconf_zero_everywhere(ca: BioCa):
 
 def sconf_one_everywhere(ca: BioCa):
 	return ca.constfilled(1.0)
+
+def sconf_random(ca: BioCa):
+	return ca.randomfilled()
 
 def main():
 	config = BioConfig()
