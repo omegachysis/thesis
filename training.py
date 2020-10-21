@@ -7,7 +7,7 @@ import wandb
 from matplotlib import pyplot as plt
 
 class Training(object):
-	def __init__(self, ca, config: Config):
+	def __init__(self, ca, config):
 		self.ca = ca
 		self.loss_hist = []
 		self.trainer = tf.keras.optimizers.Adam(config.learning_rate,
