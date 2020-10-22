@@ -21,7 +21,7 @@ class Training(object):
 			for i in tf.range(lifetime):
 				#x = self.ca(x, lock_release is not None and i >= lock_release)
 				x = self.ca(x)
-			loss = tf.reduce_mean(loss_fn(x))
+			loss = loss_fn(x)
 				
 		grads = g.gradient(loss, self.ca.model.trainable_variables)
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]
@@ -72,8 +72,6 @@ class Training(object):
 		return self.loss_hist and self.loss_hist[-1] <= self.target_loss
 	
 	def run(self, x0, xf, lifetime: int, loss_fn, max_seconds=None, max_plateau_len=None):
-		if self.is_done(): return
-
 		initial = loss = None
 		start = time.time()
 		elapsed_seconds = 0.0
@@ -115,8 +113,9 @@ class Training(object):
 
 			wandb.log(dict(loss=loss.numpy()), step=len(self.loss_hist))
 
+			print("last loss:", self.loss_hist[-1], "target: ", self.target_loss)
 			if self.is_done(): 
-				print("Stopping due to zero loss")
+				print("Stopping due to target loss")
 				show_elapsed_time()
 				return
 					

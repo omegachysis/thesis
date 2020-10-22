@@ -82,7 +82,7 @@ def loss_combined(loss1, loss2):
 class Config(object):
 	def __init__(self):
 		self.size = 32
-		self.num_channels = 12
+		self.num_channels = 15
 		self.num_subnetworks = 1
 		self.combiner_layer_size = 64
 		self.layer1_size = 256
