@@ -13,14 +13,12 @@ class BioConfig(object):
 		self.hidden_layer_size = 64
 		self.learning_rate = 3.5e-3
 		self.epsilon = 1.0e-5
-		self.training_seconds = 60
+		self.training_seconds = 120
 		self.num_sample_runs = 3
-		self.edge_strategy = 'EdgeStrategy.ZEROS'
-		self.initial_state = 'sconf_zero_everywhere'
+		self.initial_state = 'sconf_random'
 		self.target_state = 'sconf_random'
 		self.loss_fn = 'loss_mse'
-		self.lifetime = 200
-		self.clamp_values = False
+		self.lifetime = 100
 		self.target_loss = 0.0
 
 def derivative_kernel(num_channels: int):
