@@ -64,9 +64,9 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 def main():
 	config = Config()
 	config.num_subnetworks = 1
-	config.layer1_size = 256
-	config.training_seconds = 60
-	config.num_sample_runs = 3
+	config.layer1_size = 128
+	config.training_seconds = 10
+	config.num_sample_runs = 1
 	config.size = 16
 	config.target_state = 'sconf_image("lenna.png")'
 	trained_ca = build_and_train("net_transfer", config)
@@ -79,10 +79,10 @@ def main():
 	# Transfer the trained network into a larger one with two subnetworks.
 	config = Config()
 	config.num_subnetworks = 2
-	config.combiner_layer_size = 64
-	config.layer1_size = 256
-	config.training_seconds = 60
-	config.num_sample_runs = 3
+	config.combiner_layer_size = 128
+	config.layer1_size = 128
+	config.training_seconds = 10
+	config.num_sample_runs = 1
 	config.size = 16
 	config.target_state = 'sconf_image("lenna.png")'
 	config.subnetworks_description = "first subnet: trained lenna; second subnet: nothing"

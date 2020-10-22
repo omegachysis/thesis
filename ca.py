@@ -45,7 +45,7 @@ class CellularAutomata(tf.keras.Model):
 		
 		# Create sub-networks and sub-models.
 		self.submodels: List[tf.keras.Model] = []
-		suboutputs = [inputs]
+		suboutputs = []
 
 		# Track all submodel layers so we can freeze them if we need to:
 		self.submodel_layers = []
@@ -78,12 +78,16 @@ class CellularAutomata(tf.keras.Model):
 
 			# Else, combine together the subnetworks by adding a convolutional relu before 
 			# a final output.
-			combined_outputs = tf.keras.layers.concatenate(suboutputs)
-			combiner_layer = tf.keras.layers.Conv2D(filters=combiner_layer_size, kernel_size=1,
-				activation=tf.nn.relu)
-			final_output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
-				activation=None, kernel_initializer=tf.zeros_initializer())
-			outputs = final_output_layer(combiner_layer(combined_outputs))
+			# combined_outputs = tf.keras.layers.concatenate(suboutputs)
+			conv_layer = tf.keras.layers.Conv2D(
+				filters=combiner_layer_size, kernel_size=1, activation=tf.nn.relu)(inputs)
+			combiner_output = tf.keras.layers.Conv2D(
+				filters=num_subnetworks * channel_count, kernel_size=1, activation=None)(conv_layer)
+
+			concat = tf.keras.layers.Concatenate()(suboutputs)
+			weighted = tf.keras.layers.Multiply()([concat, combiner_output])
+			outputs = tf.keras.layers.Add()([weighted])
+
 			self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
 	def inject_into_submodel(self, submodel_idx: int, saved_model_path: str):
