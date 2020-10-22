@@ -47,17 +47,22 @@ class CellularAutomata(tf.keras.Model):
 		self.submodels: List[tf.keras.Model] = []
 		suboutputs = [inputs]
 
+		# Track all submodel layers so we can freeze them if we need to:
+		self.submodel_layers = []
+
 		for _ in range(num_subnetworks):
 			# Add a convolutional layer for each of the layer counts specified in the config.
 			curr_inputs = inputs
 			for layer_count in layer_counts:
 				conv_layer = tf.keras.layers.Conv2D(
 					filters=layer_count, kernel_size=1, activation=tf.nn.relu)
+				self.submodel_layers.append(conv_layer)
 				curr_inputs = conv_layer(curr_inputs)
 
 			# Create the output layer.
 			output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
 				activation=None, kernel_initializer=tf.zeros_initializer())
+			self.submodel_layers.append(output_layer)
 			outputs = output_layer(curr_inputs)
 
 			suboutputs.append(outputs)
@@ -67,6 +72,10 @@ class CellularAutomata(tf.keras.Model):
 		if len(self.submodels) == 1:
 			self.model = self.submodels[0]
 		else:
+			# Freeze submodel layers.
+			for layer in self.submodel_layers:
+				layer.trainable = False
+
 			# Else, combine together the subnetworks by adding a convolutional relu before 
 			# a final output.
 			combined_outputs = tf.keras.layers.concatenate(suboutputs)
@@ -77,9 +86,25 @@ class CellularAutomata(tf.keras.Model):
 			outputs = final_output_layer(combiner_layer(combined_outputs))
 			self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
-	def load_into_submodel(self, submodel_idx: int, sub_ca):
-		model = self.submodels[submodel_idx]
-		model.set_weights(sub_ca.model.get_weights())
+	def inject_into_submodel(self, submodel_idx: int, saved_model_path: str):
+		self.submodels[submodel_idx].load_weights(saved_model_path)
+
+		# print("Submodel layers:")
+		# for layer in self.submodels[submodel_idx].layers:
+		# 	print(layer, layer.get_weights())
+		# print("Injected sublayers:")
+		# for layer in self.model.layers:
+		# 	print(layer, layer.get_weights())
+
+		# Make sure the submodel layers are still frozen:
+		for layer in self.submodel_layers:
+			layer.trainable = False
+		self.model.compile()
+		self.model.summary()
+
+		# print("After compile sublayers:")
+		# for layer in self.model.layers:
+		# 	print(layer, layer.get_weights())
 
 	@staticmethod
 	def laplacian(x):

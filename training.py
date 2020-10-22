@@ -23,9 +23,9 @@ class Training(object):
 				x = self.ca(x)
 			loss = tf.reduce_mean(loss_fn(x))
 				
-		grads = g.gradient(loss, self.ca.weights)
+		grads = g.gradient(loss, self.ca.model.trainable_variables)
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]
-		self.trainer.apply_gradients(zip(grads, self.ca.weights))
+		self.trainer.apply_gradients(zip(grads, self.ca.model.trainable_variables))
 		return x, loss
 
 	def do_sample_run(self, x0, xf, lifetime, lock_release=None):

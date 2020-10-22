@@ -98,3 +98,4 @@ class Config(object):
 		self.lifetime = 64
 		self.clamp_values = False
 		self.target_loss = 0.0
+		self.subnetworks_description = ""
