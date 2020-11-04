@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow import keras
 import numpy as np
 import PIL.Image
 import IPython.display
@@ -14,110 +15,39 @@ class EdgeStrategy:
 	MIRROR = 2
 	RANDOM = 3
 
-class CellularAutomata(tf.keras.Model):
-	def __init__(self, img_size: int, 
-	channel_count: int, layer_counts: List[int], perception_kernel, num_subnetworks: int,
-	combiner_layer_size: int):
+class CellularAutomata(keras.Model):
+	def __init__(self, config, perception_kernel):
 		super().__init__()
 
-		self.img_size = img_size
-		self.channel_count = channel_count
-		self.conserved_mass = None
-		self.noise_range = (0.0, 0.0)
-		self.noise_mask = None
-		self.noise_replace = False
-		self.clamp_values = False
-		self.edge_strategy = EdgeStrategy.TF_SAME
-		self.lock_map = None
-		self.layer_counts = layer_counts
+		self.img_size = config.size
+		self.num_channels = config.num_channels
+		self.edge_strategy = eval(config.edge_strategy)
+		self.hidden_layer_size = config.layer1_size
 
-		# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
-		# to create a dot product along the 3rd axis, but we don't need that so we index
-		# it with None:
-		perception_kernel = perception_kernel[:, :, None, :]
-		perception_kernel = tf.repeat(perception_kernel, 
-			repeats=self.channel_count, axis=2)
-		self.perception_kernel = perception_kernel
-
-		# Create the input layer.
-		inputs = tf.keras.Input(
-			shape=(img_size, img_size, self.channel_count * perception_kernel.shape[-1]), 
-			dtype=tf.float32)
-		
-		# Create sub-networks and sub-models.
-		self.submodels: List[tf.keras.Model] = []
-		suboutputs = []
-
-		# Track all submodel layers so we can freeze them if we need to:
-		self.submodel_layers = []
-
-		for _ in range(num_subnetworks):
-			# Add a convolutional layer for each of the layer counts specified in the config.
-			curr_inputs = inputs
-			for layer_count in layer_counts:
-				conv_layer = tf.keras.layers.Conv2D(
-					filters=layer_count, kernel_size=1, activation=tf.nn.relu)
-				self.submodel_layers.append(conv_layer)
-				curr_inputs = conv_layer(curr_inputs)
-
-			# Create the output layer.
-			output_layer = tf.keras.layers.Conv2D(filters=channel_count, kernel_size=1,
-				activation=None, kernel_initializer=tf.zeros_initializer())
-			self.submodel_layers.append(output_layer)
-			outputs = output_layer(curr_inputs)
-
-			suboutputs.append(outputs)
-			self.submodels.append(tf.keras.Model(inputs=inputs, outputs=outputs))
-
-		# If there is only one subnetwork, just make the whole network the subnetwork:
-		if len(self.submodels) == 1:
-			self.model = self.submodels[0]
+		if perception_kernel is not None:
+			# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
+			# to create a dot product along the 3rd axis, but we don't need that so we index
+			# it with None:
+			perception_kernel = perception_kernel[:, :, None, :]
+			perception_kernel = tf.repeat(perception_kernel, 
+				repeats=self.num_channels, axis=2)
+			self.perception_kernel = perception_kernel
+			self.use_perception_model = False
 		else:
-			# Freeze submodel layers.
-			for layer in self.submodel_layers:
-				layer.trainable = False
+			self.perception_model = keras.Sequential([
+				keras.layers.Conv2D(config.perceive_layer_size, 
+					kernel_size=config.perception_kernel_size, activation=tf.nn.relu, padding="SAME"),
+			])
+			self.use_perception_model = True
 
-			# Else, combine together the subnetworks by adding a convolutional relu before 
-			# a final output.
-			# combined_outputs = tf.keras.layers.concatenate(suboutputs)
-			conv_layer = tf.keras.layers.Conv2D(
-				filters=combiner_layer_size, kernel_size=1, activation=tf.nn.relu)(inputs)
-			combiner_output = tf.keras.layers.Conv2D(
-				filters=num_subnetworks * channel_count, kernel_size=1, activation=None)(conv_layer)
+		self.model = keras.Sequential([
+			keras.layers.Conv2D(self.hidden_layer_size, kernel_size=1, activation=tf.nn.relu),
+			keras.layers.Conv2D(self.num_channels, kernel_size=1, activation=None)
+		])
 
-			concat = tf.keras.layers.Concatenate()(suboutputs)
-			weighted = tf.keras.layers.Multiply()([concat, combiner_output])
-			outputs = tf.keras.layers.Add()([weighted])
-
-			self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
-
-	def create_copy(self, new_img_size):
-		weights = self.model.get_weights()
-		new_ca = CellularAutomata(new_img_size, channel_count=self.channel_count,
-			layer_counts=self.layer_counts, perception_kernel=self.perception_kernel,
-			num_subnetworks=1, combiner_layer_size=1)
-		new_ca.model.set_weights(weights)
-		return new_ca
-
-	def inject_into_submodel(self, submodel_idx: int, saved_model_path: str):
-		self.submodels[submodel_idx].load_weights(saved_model_path)
-
-		# print("Submodel layers:")
-		# for layer in self.submodels[submodel_idx].layers:
-		# 	print(layer, layer.get_weights())
-		# print("Injected sublayers:")
-		# for layer in self.model.layers:
-		# 	print(layer, layer.get_weights())
-
-		# Make sure the submodel layers are still frozen:
-		for layer in self.submodel_layers:
-			layer.trainable = False
-		self.model.compile()
+		# Compile the model:
+		self(tf.zeros([1, 3, 3, self.num_channels]))
 		self.model.summary()
-
-		# print("After compile sublayers:")
-		# for layer in self.model.layers:
-		# 	print(layer, layer.get_weights())
 
 	@staticmethod
 	def laplacian(x):
@@ -174,7 +104,7 @@ class CellularAutomata(tf.keras.Model):
 			pad_mode = "VALID"
 			paddings = tf.constant([[0,0], [1,1], [1,1], [0,0]])
 			x = tf.pad(x, paddings, "CONSTANT")
-			mask = tf.constant(0.0, shape=(1, self.img_size, self.img_size, self.channel_count))
+			mask = tf.constant(0.0, shape=(1, self.img_size, self.img_size, self.num_channels))
 			mask = tf.pad(mask, paddings, "CONSTANT", constant_values=1.0)
 			noise = tf.cast(tf.random.uniform(tf.shape(mask[...])), tf.float32)
 			x += mask * noise
@@ -188,31 +118,13 @@ class CellularAutomata(tf.keras.Model):
 
 	@tf.function
 	def call(self, x):
-		s = self.perceive(x)
+		if self.use_perception_model:
+			s = self.perception_model(x)
+		else:
+			s = self.perceive(x)
+
 		dx = self.model(s)
 		x += dx
-		
-		# if self.lock_map is not None and not lock_release:
-		# 	x += dx * self.lock_map
-		# else:
-		# 	x += dx
-
-		# if self.noise_range is not None:
-		# 	# Add random noise.
-		# 	noise_len = self.noise_range[1] - self.noise_range[0]
-		# 	noise_val = tf.cast(tf.random.uniform(tf.shape(x)), tf.float32)
-		# 	if self.noise_mask is not None:
-		# 		noise_val *= self.noise_mask
-
-		# 	if self.noise_replace and self.noise_mask is not None:
-		# 		x = x * (1.0-self.noise_mask) + \
-		# 			noise_val * noise_len + self.noise_range[0]
-		# 	else:
-		# 		x += noise_val * noise_len + self.noise_range[0]
-				
-		# if self.clamp_values:
-		# 	x = tf.clip_by_value(x, 0., 1.)
-
 		return x
 	
 	def imagefilled(self, image_path):
@@ -237,12 +149,12 @@ class CellularAutomata(tf.keras.Model):
 
 	def constfilled(self, u):
 		""" Fills the world with u. """
-		return np.ones((self.img_size, self.img_size, self.channel_count), dtype=np.float32) * u
+		return np.ones((self.img_size, self.img_size, self.num_channels), dtype=np.float32) * u
 			
 	def pointfilled(self, x, point_value, pos=(.5,.5)):
 		""" Add a single point of value u. """
 		x[int(self.img_size*pos[1]), int(self.img_size*pos[0])] = \
-			np.ones((self.channel_count,)) * point_value
+			np.ones((self.num_channels,)) * point_value
 		return x
 
 	def pointsfilled(self, x, point_value, positions):
@@ -252,7 +164,7 @@ class CellularAutomata(tf.keras.Model):
 	
 	def randomfilled(self):
 		""" Fills the world with random numbers from 0 to the random fill maximum. """
-		x = np.random.rand(self.img_size, self.img_size, self.channel_count).astype(np.float32)
+		x = np.random.rand(self.img_size, self.img_size, self.num_channels).astype(np.float32)
 		return x
 
 	def bordered(self, x, border_value, width=1):
@@ -272,23 +184,27 @@ class CellularAutomata(tf.keras.Model):
 			if px < 0 or py < 0: continue
 			if px >= self.img_size or py >= self.img_size: continue
 
-			for channel in range(self.channel_count):
+			for channel in range(self.num_channels):
 				x[px, py, channel] = line_value
 		return x
 			
 	def to_image(self, x, scale=1):
-		hsize = math.ceil(self.channel_count / 3)
+		hsize = math.ceil(self.num_channels / 3)
 		arr = np.zeros((self.img_size, self.img_size * hsize, 3))
 		# Fill the image array with the RGB images generated from the 
 		# state in RGB and the hidden channels in groups of 3.
-		for i in range(self.channel_count):
+		for i in range(self.num_channels):
 			s = x[..., i]
-			# Hidden channel, scale to fit color space.
-			a = np.min(s)
-			b = np.max(s)
-			ba = max(1.0, b-a)
-			s -= a
-			s *= 1/ba
+			if i >= 3:
+				# Hidden channel, scale to fit color space.
+				a = np.min(s)
+				b = np.max(s)
+				ba = max(1.0, b-a)
+				s -= a
+				s *= 1/ba
+			else:
+				# For visible channels, clamp colors to fit color space.
+				s = np.clip(s, 0.0, 1.0)
 			arr[:, self.img_size*(i//3) : self.img_size*(i//3+1), i%3] = s
 
 		rgb_array = np.uint8(arr * 255.0)

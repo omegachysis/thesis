@@ -113,7 +113,7 @@ class Training(object):
 
 			wandb.log(dict(loss=loss.numpy()), step=len(self.loss_hist))
 
-			print("last loss:", self.loss_hist[-1], "target: ", self.target_loss)
+			# print("last loss:", self.loss_hist[-1], "target: ", self.target_loss)
 			if self.is_done(): 
 				print("Stopping due to target loss")
 				show_elapsed_time()

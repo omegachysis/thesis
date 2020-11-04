@@ -83,10 +83,9 @@ class Config(object):
 	def __init__(self):
 		self.size = 32
 		self.num_channels = 15
-		self.num_subnetworks = 1
-		self.combiner_layer_size = 64
 		self.layer1_size = 256
-		self.layer2_size = 0
+		self.perceive_layer_size = 256
+		self.perception_kernel_size = 3
 		self.learning_rate = 3.5e-3
 		self.epsilon = 1.0e-5
 		self.training_seconds = 60
@@ -96,6 +95,4 @@ class Config(object):
 		self.target_state = 'sconf_image("lenna.png")'
 		self.loss_fn = 'loss_rmse'
 		self.lifetime = 64
-		self.clamp_values = False
 		self.target_loss = 0.0
-		self.subnetworks_description = ""

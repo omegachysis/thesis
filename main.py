@@ -14,15 +14,7 @@ class TrainedCa(object):
 def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedCa:
 	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
-	layer_counts = []
-	if config.layer1_size: layer_counts.append(config.layer1_size)
-	if config.layer2_size: layer_counts.append(config.layer2_size)
-
-	ca = CellularAutomata(img_size=config.size, channel_count=config.num_channels,
-		layer_counts=layer_counts, perception_kernel=kernel_sobel(),
-		num_subnetworks=config.num_subnetworks, combiner_layer_size=config.combiner_layer_size)
-	ca.edge_strategy = eval(config.edge_strategy)
-	ca.clamp_values = config.clamp_values
+	ca = CellularAutomata(config, perception_kernel=None) #=kernel_sobel())
 
 	if ca_modifier_fn: ca_modifier_fn(ca)
 
@@ -53,11 +45,13 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 			lf = CellularAutomata.laplacian(f)
 			laplace_err = tf.reduce_mean(tf.square(lx - lf))
 			mse = tf.reduce_mean(tf.square(x - f))
-			return laplace_err + mse
+			return mse + laplace_err
 
 		training.run(x0_fn, xf_fn, lifetime, loss_fn, max_seconds=interval_seconds)
 
 		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
+		if ca.perception_model is not None:
+			ca.perception_model.save(os.path.join(wandb.run.dir, f"perceive_model_{i}.h5"))
 
 		# Save a sample run:
 		sample_run = training.do_sample_run(x0_fn, lifetime)
@@ -79,16 +73,20 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 	return TrainedCa(ca, training)
 
 def main():
-	num_steps = 4
+	num_steps = 20
 
 	config = Config()
 	config.layer1_size = 256
+	config.perceive_layer_size = 64
+	config.perception_kernel_size = 3
+	config.num_channels = 15
 	config.training_seconds = num_steps*999
-	config.target_loss = 0.05
+	config.target_loss = 0.01
 	config.num_sample_runs = num_steps
-	config.lifetime = 60
-	config.size = 16
+	config.lifetime = 100
+	config.size = 64
 	config.initial_state = 'sconf_center_black_dot'
-	config.target_state = 'sconf_image("nautilus.png")'
+	config.target_state = 'sconf_image("lenna.png")'
 	config.edge_strategy = 'EdgeStrategy.MIRROR'
+	#config.loss_fn = 'loss_rmse'
 	trained_ca = build_and_train("trainable_filter", config)
