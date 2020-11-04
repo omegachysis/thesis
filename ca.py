@@ -29,6 +29,7 @@ class CellularAutomata(tf.keras.Model):
 		self.clamp_values = False
 		self.edge_strategy = EdgeStrategy.TF_SAME
 		self.lock_map = None
+		self.layer_counts = layer_counts
 
 		# Project the perception tensor so that it is 4D. This is used by the depthwise convolution
 		# to create a dot product along the 3rd axis, but we don't need that so we index
@@ -89,6 +90,14 @@ class CellularAutomata(tf.keras.Model):
 			outputs = tf.keras.layers.Add()([weighted])
 
 			self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
+
+	def create_copy(self, new_img_size):
+		weights = self.model.get_weights()
+		new_ca = CellularAutomata(new_img_size, channel_count=self.channel_count,
+			layer_counts=self.layer_counts, perception_kernel=self.perception_kernel,
+			num_subnetworks=1, combiner_layer_size=1)
+		new_ca.model.set_weights(weights)
+		return new_ca
 
 	def inject_into_submodel(self, submodel_idx: int, saved_model_path: str):
 		self.submodels[submodel_idx].load_weights(saved_model_path)

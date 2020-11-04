@@ -28,7 +28,7 @@ class Training(object):
 		self.trainer.apply_gradients(zip(grads, self.ca.model.trainable_variables))
 		return x, loss
 
-	def do_sample_run(self, x0, xf, lifetime, lock_release=None):
+	def do_sample_run(self, x0, lifetime):
 		# Run the CA for its lifetime with the current weights.
 		x = x0()[None, ...]
 				

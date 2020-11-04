@@ -60,7 +60,7 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
 
 		# Save a sample run:
-		sample_run = training.do_sample_run(x0_fn, xf_fn, lifetime)
+		sample_run = training.do_sample_run(x0_fn, lifetime)
 		gif_path = f"temp/sample_run_{i}.gif"
 		with open(gif_path, 'wb') as gif:
 			gif.write(ca.create_gif(sample_run))
@@ -79,16 +79,16 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 	return TrainedCa(ca, training)
 
 def main():
-	num_steps = 10
+	num_steps = 4
 
 	config = Config()
 	config.layer1_size = 256
-	config.training_seconds = num_steps*240
-	config.target_loss = 0.03
+	config.training_seconds = num_steps*999
+	config.target_loss = 0.05
 	config.num_sample_runs = num_steps
-	config.lifetime = 100
-	config.size = 64
+	config.lifetime = 60
+	config.size = 16
 	config.initial_state = 'sconf_center_black_dot'
 	config.target_state = 'sconf_image("nautilus.png")'
 	config.edge_strategy = 'EdgeStrategy.MIRROR'
-	build_and_train("gradual_size_increase", config)
+	trained_ca = build_and_train("trainable_filter", config)
