@@ -36,18 +36,20 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 
 	start = time.time()
 
-	def save_sample_run(i: int):
-		sample_run = training.do_sample_run(x0_fn, config.lifetime)
+	def save_sample_run(i: int, lf: int):
+		sample_run = training.do_sample_run(x0_fn, lf)
 		gif_path = f"temp/sample_run_{i}.gif"
 		with open(gif_path, 'wb') as gif:
 			gif.write(ca.create_gif(sample_run))
 		final_img = ca.to_image(sample_run[-1])
 		wandb.log({
+			f""
 			f"final_state": wandb.Image(final_img),
 			f"video": wandb.Video(gif_path)},
 			step=len(training.loss_hist))
+		return sample_run[-1]
 
-	save_sample_run(0)
+	save_sample_run(0, config.lifetime)
 
 	for i in range(config.num_sample_runs):
 		if config.use_growing_square:
@@ -61,32 +63,42 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 		print("Lifetime: ", lifetime)
 		print("Target size: ", target_size)
 
-		def loss_fn(x):
-			x = x[:, a:b, a:b, :config.target_channels]
-			f = xf[None, a:b, a:b, :config.target_channels]
+		def loss_fn(x, min_channel, max_channel):
+			x = x[:, a:b, a:b, min_channel:max_channel]
+			f = xf[None, a:b, a:b, min_channel:max_channel]
 			lx = CellularAutomata.laplacian(x)
 			lf = CellularAutomata.laplacian(f)
 			laplace_err = tf.reduce_mean(tf.square(lx - lf))
 			mse = tf.reduce_mean(tf.square(x - f))
 			return mse + laplace_err
+		
+		def configured_loss_fn(x):
+			return loss_fn(x, min_channel=0, max_channel=config.target_channels)
 
-		training.run(x0_fn, xf_fn, lifetime, loss_fn, max_seconds=interval_seconds)
+		training.run(x0_fn, xf_fn, lifetime, configured_loss_fn, max_seconds=interval_seconds)
 
 		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
 		if ca.perception_model is not None:
 			ca.perception_model.save(os.path.join(wandb.run.dir, f"perceive_model_{i}.h5"))
 
-		save_sample_run(i+1)
+		final_state = save_sample_run(i+1, lifetime)[None, ...]
 		
 		best_so_far = min(training.loss_hist)
 		print("Best loss: ", best_so_far)
 
+		for i in range(config.target_channels):
+			loss = loss_fn(final_state, i, i+1).numpy()
+			print(f"channel{i+1}_loss: ", loss)
+			wandb.run.summary[f"channel{i+1}_loss"] = loss
+
 	elapsed_total = time.time() - start
 	print("Total elapsed time:", elapsed_total, "seconds")
 
+	wandb.run.summary["total_seconds"] = elapsed_total
+
 	return TrainedCa(ca, training)
 
-def main():
+def multi_image_learning():
 	config = Config()
 	config.layer1_size = 256
 	config.num_channels = 15
@@ -126,14 +138,23 @@ def comparing_stacked_vs_separate():
 	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.use_growing_square = True
 
-	for _ in range(1):
+	# for _ in range(1):
+	# 	config.target_state = 'sconf_image("lenna.png")'
+	# 	build_and_train("stacked_training", config)
+	# for _ in range(1):
+	# 	config.target_state = 'sconf_image("nautilus.png")'
+	# 	build_and_train("stacked_training", config)
+	# for _ in range(1):
+	# 	config.target_channels = 6
+	# 	config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
+	# 	build_and_train("stacked_training", config)
+
+	for i in reversed(range(3)):
+		config.target_channels = i + 1
 		config.target_state = 'sconf_image("lenna.png")'
 		build_and_train("stacked_training", config)
-	for _ in range(1):
-		config.target_state = 'sconf_image("nautilus.png")'
-		build_and_train("stacked_training", config)
-	for _ in range(1):
-		config.target_channels = 6
-		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
-		build_and_train("stacked_training", config)
+
+def main():
+	comparing_stacked_vs_separate()
