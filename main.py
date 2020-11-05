@@ -14,7 +14,10 @@ class TrainedCa(object):
 def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedCa:
 	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
-	ca = CellularAutomata(config, perception_kernel=None) #=kernel_sobel())
+	perception_kernel = None
+	if config.perception_kernel_size == 0 or config.perceive_layer_size == 0:
+		perception_kernel = kernel_sobel()
+	ca = CellularAutomata(config, perception_kernel)
 
 	if ca_modifier_fn: ca_modifier_fn(ca)
 
@@ -73,7 +76,7 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 	return TrainedCa(ca, training)
 
 def main():
-	num_steps = 20
+	num_steps = 5
 
 	config = Config()
 	config.layer1_size = 256
@@ -83,10 +86,20 @@ def main():
 	config.training_seconds = num_steps*999
 	config.target_loss = 0.01
 	config.num_sample_runs = num_steps
-	config.lifetime = 100
-	config.size = 64
+	config.lifetime = 50
+	config.size = 25
 	config.initial_state = 'sconf_center_black_dot'
 	config.target_state = 'sconf_image("lenna.png")'
-	config.edge_strategy = 'EdgeStrategy.MIRROR'
-	#config.loss_fn = 'loss_rmse'
-	trained_ca = build_and_train("trainable_filter", config)
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+
+	# Do a bunch of runs with the Sobel filter:
+	for i in range(20):
+		print(f"Running experiment {i} with Sobel filter")
+		config.perceive_layer_size = 0
+		build_and_train("trainable_filter_1", config)
+
+	# Do a bunch of runs with a trainable 3x3 filter of 64 relus:
+	for i in range(20):
+		print(f"Running experiment {i} with trainable filter")
+		config.perceive_layer_size = 16
+		build_and_train("trainable_filter_1", config)

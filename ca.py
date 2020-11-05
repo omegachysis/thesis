@@ -33,6 +33,7 @@ class CellularAutomata(keras.Model):
 				repeats=self.num_channels, axis=2)
 			self.perception_kernel = perception_kernel
 			self.use_perception_model = False
+			self.perception_model = None
 		else:
 			self.perception_model = keras.Sequential([
 				keras.layers.Conv2D(config.perceive_layer_size, 
