@@ -35,6 +35,11 @@ def sconf_image(filename: str):
 		return ca.imagefilled("images/" + filename)
 	return f
 
+def sconf_imagestack(*filenames):
+	def f(ca: CellularAutomata):
+		return ca.imagestackfilled(["images/" + fn for fn in filenames])
+	return f
+
 def sconf_center_black_dot(ca: CellularAutomata):
 	return ca.pointfilled(ca.constfilled(1.0), point_value=0.0)
 
@@ -83,9 +88,10 @@ class Config(object):
 	def __init__(self):
 		self.size = 32
 		self.num_channels = 15
+		self.target_channels = 3
 		self.layer1_size = 256
-		self.perceive_layer_size = 256
-		self.perception_kernel_size = 3
+		self.perceive_layer_size = 0
+		self.perception_kernel_size = 0
 		self.learning_rate = 3.5e-3
 		self.epsilon = 1.0e-5
 		self.training_seconds = 60
@@ -96,3 +102,4 @@ class Config(object):
 		self.loss_fn = 'loss_rmse'
 		self.lifetime = 64
 		self.target_loss = 0.0
+		self.use_growing_square = False

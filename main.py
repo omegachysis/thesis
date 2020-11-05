@@ -11,13 +11,16 @@ class TrainedCa(object):
 		self.ca = ca
 		self.training = training
 
-def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedCa:
+def build_and_train(group: str, config: Config, ca_modifier_fn=None,
+	use_trained_ca: TrainedCa=None) -> TrainedCa:
 	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
 	perception_kernel = None
 	if config.perception_kernel_size == 0 or config.perceive_layer_size == 0:
 		perception_kernel = kernel_sobel()
 	ca = CellularAutomata(config, perception_kernel)
+	if use_trained_ca is not None:
+		ca.model = use_trained_ca.ca.model
 
 	if ca_modifier_fn: ca_modifier_fn(ca)
 
@@ -34,16 +37,20 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 	start = time.time()
 
 	for i in range(config.num_sample_runs):
-		lifetime = (config.lifetime // config.num_sample_runs) * (i+1)
-		target_size = (config.size // config.num_sample_runs) * (i+1)
+		if config.use_growing_square:
+			lifetime = (config.lifetime // config.num_sample_runs) * (i+1)
+			target_size = (config.size // config.num_sample_runs) * (i+1)
+		else:
+			lifetime = config.lifetime
+			target_size = config.size
 		a = config.size // 2 - target_size // 2
 		b = config.size // 2 + target_size // 2
 		print("Lifetime: ", lifetime)
 		print("Target size: ", target_size)
 
 		def loss_fn(x):
-			x = x[:, a:b, a:b, :3]
-			f = xf[None, a:b, a:b, :3]
+			x = x[:, a:b, a:b, :config.target_channels]
+			f = xf[None, a:b, a:b, :config.target_channels]
 			lx = CellularAutomata.laplacian(x)
 			lf = CellularAutomata.laplacian(f)
 			laplace_err = tf.reduce_mean(tf.square(lx - lf))
@@ -76,30 +83,50 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None) -> TrainedC
 	return TrainedCa(ca, training)
 
 def main():
-	num_steps = 5
-
 	config = Config()
 	config.layer1_size = 256
-	config.perceive_layer_size = 64
-	config.perception_kernel_size = 3
 	config.num_channels = 15
-	config.training_seconds = num_steps*999
+	config.target_channels = 3
+	config.training_seconds = 999
 	config.target_loss = 0.01
-	config.num_sample_runs = num_steps
+	config.num_sample_runs = 3
 	config.lifetime = 50
 	config.size = 25
 	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.use_growing_square = False
+
+	# Sanity check that copying models works:
+
 	config.target_state = 'sconf_image("lenna.png")'
+	trained_ca = build_and_train("multi_image", config)
+
+	config.target_state = 'sconf_image("lenna.png")'
+	build_and_train("multi_image", config, use_trained_ca=trained_ca)
+
+def comparing_stacked_vs_separate():
+	""" In this experiment we check if learning multiple images in parallel
+	takes less time than learning the images separately. """
+
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 15
+	config.target_channels = 3
+	config.training_seconds = 999
+	config.target_loss = 0.01
+	config.num_sample_runs = 10
+	config.lifetime = 64
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 
-	# Do a bunch of runs with the Sobel filter:
-	for i in range(20):
-		print(f"Running experiment {i} with Sobel filter")
-		config.perceive_layer_size = 0
-		build_and_train("trainable_filter_1", config)
-
-	# Do a bunch of runs with a trainable 3x3 filter of 64 relus:
-	for i in range(20):
-		print(f"Running experiment {i} with trainable filter")
-		config.perceive_layer_size = 16
-		build_and_train("trainable_filter_1", config)
+	for _ in range(1):
+		config.target_state = 'sconf_image("lenna.png")'
+		build_and_train("stacked_training", config)
+	for _ in range(1):
+		config.target_state = 'sconf_image("nautilus.png")'
+		build_and_train("stacked_training", config)
+	for _ in range(1):
+		config.target_channels = 6
+		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
+		build_and_train("stacked_training", config)
