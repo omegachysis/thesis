@@ -20,7 +20,7 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 		perception_kernel = kernel_sobel()
 	ca = CellularAutomata(config, perception_kernel)
 	if use_trained_ca is not None:
-		ca.model = use_trained_ca.ca.model
+		ca.copy_weights_from(use_trained_ca.ca)
 
 	if ca_modifier_fn: ca_modifier_fn(ca)
 
@@ -35,6 +35,19 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 	interval_seconds = config.training_seconds / config.num_sample_runs
 
 	start = time.time()
+
+	def save_sample_run(i: int):
+		sample_run = training.do_sample_run(x0_fn, config.lifetime)
+		gif_path = f"temp/sample_run_{i}.gif"
+		with open(gif_path, 'wb') as gif:
+			gif.write(ca.create_gif(sample_run))
+		final_img = ca.to_image(sample_run[-1])
+		wandb.log({
+			f"final_state": wandb.Image(final_img),
+			f"video": wandb.Video(gif_path)},
+			step=len(training.loss_hist))
+
+	save_sample_run(0)
 
 	for i in range(config.num_sample_runs):
 		if config.use_growing_square:
@@ -63,16 +76,7 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 		if ca.perception_model is not None:
 			ca.perception_model.save(os.path.join(wandb.run.dir, f"perceive_model_{i}.h5"))
 
-		# Save a sample run:
-		sample_run = training.do_sample_run(x0_fn, lifetime)
-		gif_path = f"temp/sample_run_{i}.gif"
-		with open(gif_path, 'wb') as gif:
-			gif.write(ca.create_gif(sample_run))
-		final_img = ca.to_image(sample_run[-1])
-		wandb.log({
-			f"final_state": wandb.Image(final_img),
-			f"video": wandb.Video(gif_path)},
-			step=len(training.loss_hist))
+		save_sample_run(i+1)
 		
 		best_so_far = min(training.loss_hist)
 		print("Best loss: ", best_so_far)
@@ -87,8 +91,8 @@ def main():
 	config.layer1_size = 256
 	config.num_channels = 15
 	config.target_channels = 3
-	config.training_seconds = 999
-	config.target_loss = 0.01
+	config.training_seconds = 60
+	#config.target_loss = 0.01
 	config.num_sample_runs = 3
 	config.lifetime = 50
 	config.size = 25
@@ -99,10 +103,13 @@ def main():
 	# Sanity check that copying models works:
 
 	config.target_state = 'sconf_image("lenna.png")'
-	trained_ca = build_and_train("multi_image", config)
+	res1 = build_and_train("multi_image", config)
+
+	config.target_state = 'sconf_image("nautilus.png")'
+	res2 = build_and_train("multi_image", config, use_trained_ca=res1)
 
 	config.target_state = 'sconf_image("lenna.png")'
-	build_and_train("multi_image", config, use_trained_ca=trained_ca)
+	res3 = build_and_train("multi_image", config, use_trained_ca=res1)
 
 def comparing_stacked_vs_separate():
 	""" In this experiment we check if learning multiple images in parallel

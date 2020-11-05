@@ -50,6 +50,9 @@ class CellularAutomata(keras.Model):
 		self(tf.zeros([1, 3, 3, self.num_channels]))
 		self.model.summary()
 
+	def copy_weights_from(self, other):
+		self.model.set_weights(other.model.get_weights())
+
 	@staticmethod
 	def laplacian(x):
 		Δ = tf.reshape(tf.constant([
