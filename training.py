@@ -15,18 +15,21 @@ class Training(object):
 		self.target_loss = config.target_loss
 
 	@tf.function
-	def train_step(self, x0, xf, lifetime, loss_fn, lock_release: int=None):
+	def train_step(self, x0, xf, lifetime, loss_fn, target_channels, lock_release: int=None):
 		x = x0
 		with tf.GradientTape() as g:
 			for i in tf.range(lifetime):
 				#x = self.ca(x, lock_release is not None and i >= lock_release)
 				x = self.ca(x)
-			loss = loss_fn(x)
+			losses = []
+			for channel in range(target_channels):
+				losses.append(loss_fn(x, channel))
+			loss = tf.reduce_mean(losses)
 				
 		grads = g.gradient(loss, self.ca.model.trainable_variables)
 		grads = [g / (tf.norm(g) + 1.0e-8) for g in grads]
 		self.trainer.apply_gradients(zip(grads, self.ca.model.trainable_variables))
-		return x, loss
+		return x, losses
 
 	def do_sample_run(self, x0, lifetime):
 		# Run the CA for its lifetime with the current weights.
@@ -71,7 +74,8 @@ class Training(object):
 	def is_done(self):
 		return self.loss_hist and self.loss_hist[-1] <= self.target_loss
 	
-	def run(self, x0, xf, lifetime: int, loss_fn, max_seconds=None, max_plateau_len=None):
+	def run(self, x0, xf, lifetime: int, loss_fn, target_channels, 
+	max_seconds=None, max_plateau_len=None):
 		initial = loss = None
 		start = time.time()
 		elapsed_seconds = 0.0
@@ -98,7 +102,8 @@ class Training(object):
 			target = np.repeat(xf()[None, ...], 1, 0) if xf is not None else None
 
 			# Run training step:
-			_, loss = self.train_step(initial, target, lifetime, loss_fn)
+			_, losses = self.train_step(initial, target, lifetime, loss_fn, target_channels)
+			loss = tf.reduce_mean(losses)
 
 			# Update best loss and increment plateau:
 			if best_loss is None or loss.numpy() < best_loss:
@@ -111,9 +116,11 @@ class Training(object):
 			elapsed_seconds = time.time() - start
 			num_steps += 1
 
-			wandb.log(dict(loss=loss.numpy()), step=len(self.loss_hist))
+			log_data = {"loss" : loss.numpy(), "step" : len(self.loss_hist)}
+			for i in range(target_channels // 3):
+				log_data[f"loss{i}"] = tf.reduce_mean([losses[j] for j in range(i*3,i*3+3)])
+			wandb.log(log_data)
 
-			# print("last loss:", self.loss_hist[-1], "target: ", self.target_loss)
 			if self.is_done(): 
 				print("Stopping due to target loss")
 				show_elapsed_time()

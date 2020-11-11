@@ -63,19 +63,17 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 		print("Lifetime: ", lifetime)
 		print("Target size: ", target_size)
 
-		def loss_fn(x, min_channel, max_channel):
-			x = x[:, a:b, a:b, min_channel:max_channel]
-			f = xf[None, a:b, a:b, min_channel:max_channel]
+		def loss_fn(x, channel):
+			x = x[:, a:b, a:b, channel:channel+1]
+			f = xf[None, a:b, a:b, channel:channel+1]
 			lx = CellularAutomata.laplacian(x)
 			lf = CellularAutomata.laplacian(f)
 			laplace_err = tf.reduce_mean(tf.square(lx - lf))
 			mse = tf.reduce_mean(tf.square(x - f))
 			return mse + laplace_err
-		
-		def configured_loss_fn(x):
-			return loss_fn(x, min_channel=0, max_channel=config.target_channels)
 
-		training.run(x0_fn, xf_fn, lifetime, configured_loss_fn, max_seconds=interval_seconds)
+		training.run(x0_fn, xf_fn, lifetime, loss_fn, 
+			config.target_channels, max_seconds=interval_seconds)
 
 		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
 		if ca.perception_model is not None:
@@ -85,11 +83,6 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 		
 		best_so_far = min(training.loss_hist)
 		print("Best loss: ", best_so_far)
-
-		for i in range(config.target_channels):
-			loss = loss_fn(final_state, i, i+1).numpy()
-			print(f"channel{i+1}_loss: ", loss)
-			wandb.run.summary[f"channel{i+1}_loss"] = loss
 
 	elapsed_total = time.time() - start
 	print("Total elapsed time:", elapsed_total, "seconds")
@@ -133,9 +126,9 @@ def comparing_stacked_vs_separate():
 	config.target_channels = 3
 	config.training_seconds = 999
 	config.target_loss = 0.01
-	config.num_sample_runs = 10
-	config.lifetime = 64
-	config.size = 32
+	config.num_sample_runs = 4
+	config.lifetime = 32
+	config.size = 16
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 	config.use_growing_square = True
@@ -146,15 +139,16 @@ def comparing_stacked_vs_separate():
 	# for _ in range(1):
 	# 	config.target_state = 'sconf_image("nautilus.png")'
 	# 	build_and_train("stacked_training", config)
-	# for _ in range(1):
-	# 	config.target_channels = 6
-	# 	config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
-	# 	build_and_train("stacked_training", config)
 
-	for i in reversed(range(3)):
-		config.target_channels = i + 1
-		config.target_state = 'sconf_image("lenna.png")'
+	for _ in range(1):
+		config.target_channels = 6
+		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
 		build_and_train("stacked_training", config)
+
+	# for i in reversed(range(3)):
+	# 	config.target_channels = i + 1
+	# 	config.target_state = 'sconf_image("lenna.png")'
+	# 	build_and_train("stacked_training_1", config)
 
 def main():
 	comparing_stacked_vs_separate()
