@@ -199,16 +199,7 @@ class CellularAutomata(keras.Model):
 		# state in RGB and the hidden channels in groups of 3.
 		for i in range(self.num_channels):
 			s = x[..., i]
-			if i >= 3:
-				# Hidden channel, scale to fit color space.
-				a = np.min(s)
-				b = np.max(s)
-				ba = max(1.0, b-a)
-				s -= a
-				s *= 1/ba
-			else:
-				# For visible channels, clamp colors to fit color space.
-				s = np.clip(s, 0.0, 1.0)
+			s = np.clip(s, 0.0, 1.0)
 			arr[:, self.img_size*(i//3) : self.img_size*(i//3+1), i%3] = s
 
 		rgb_array = np.uint8(arr * 255.0)

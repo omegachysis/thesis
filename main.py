@@ -32,6 +32,9 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 	x0_fn = lambda: x0
 	xf_fn = lambda: xf
 
+	print("Target state:")
+	ca.display(xf)
+
 	interval_seconds = config.training_seconds / config.num_sample_runs
 
 	start = time.time()
@@ -121,34 +124,48 @@ def comparing_stacked_vs_separate():
 	takes less time than learning the images separately. """
 
 	config = Config()
-	config.layer1_size = 256
+	config.layer1_size = 350
 	config.num_channels = 15
 	config.target_channels = 3
 	config.training_seconds = 999
 	config.target_loss = 0.01
-	config.num_sample_runs = 4
-	config.lifetime = 32
-	config.size = 16
+	config.num_sample_runs = 8
+	config.lifetime = 64
+	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 	config.use_growing_square = True
+	config.target_state = 'sconf_imagestack("lenna.png", "lenna.png")'
 
-	# for _ in range(1):
-	# 	config.target_state = 'sconf_image("lenna.png")'
-	# 	build_and_train("stacked_training", config)
-	# for _ in range(1):
-	# 	config.target_state = 'sconf_image("nautilus.png")'
-	# 	build_and_train("stacked_training", config)
+	num_trials_each = 1
 
-	for _ in range(1):
-		config.target_channels = 6
+	for _ in range(num_trials_each):
+		# Train a lenna on its own:
+		config.target_state = 'sconf_image("lenna.png")'
+		config.num_channels = 15
+		config.target_channels = 3
+		build_and_train("stacked_training_1", config)
+
+	for _ in range(num_trials_each):
+		# Train a lenna on its own:
+		config.target_state = 'sconf_image("nautilus.png")'
+		config.num_channels = 15
+		config.target_channels = 3
+		build_and_train("stacked_training_1", config)
+
+	for _ in range(num_trials_each):
+		# Run an experiment with two different layered targets:
 		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
-		build_and_train("stacked_training", config)
+		config.num_channels = 15
+		config.target_channels = 6
+		build_and_train("stacked_training_1", config)
 
-	# for i in reversed(range(3)):
-	# 	config.target_channels = i + 1
-	# 	config.target_state = 'sconf_image("lenna.png")'
-	# 	build_and_train("stacked_training_1", config)
+	for _ in range(num_trials_each):
+		# Run an experiment with two different layered targets:
+		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
+		config.num_channels = 18
+		config.target_channels = 6
+		build_and_train("stacked_training_1", config)
 
 def main():
 	comparing_stacked_vs_separate()
