@@ -139,33 +139,29 @@ def comparing_stacked_vs_separate():
 
 	num_trials_each = 1
 
-	for _ in range(num_trials_each):
-		# Train a lenna on its own:
+	# First, we'll form a lenna on its own with anywhere from 6 to 30 channels.
+	for channel_count in range(6,30+1):
+		print(f"Lenna with {channel_count} total channels");
 		config.target_state = 'sconf_image("lenna.png")'
-		config.num_channels = 15
+		config.num_channels = channel_count
 		config.target_channels = 3
-		build_and_train("stacked_training_1", config)
+		build_and_train("stacked_training_2", config)
 
-	for _ in range(num_trials_each):
-		# Train a lenna on its own:
+	# Next, we'll form a nautilus on its own with anywhere from 6 to 30 channels.
+	for channel_count in range(6,30+1):
+		print(f"Nautilus with {channel_count} total channels");
 		config.target_state = 'sconf_image("nautilus.png")'
-		config.num_channels = 15
+		config.num_channels = channel_count
 		config.target_channels = 3
-		build_and_train("stacked_training_1", config)
+		build_and_train("stacked_training_2", config)
 
-	for _ in range(num_trials_each):
-		# Run an experiment with two different layered targets:
+	# Finally, we'll form a lenna/nautilus stack in parallel with anywhere from 9 to 30 channels.
+	for channel_count in range(9,30+1):
+		print(f"Lenna/Nautilus stack with {channel_count} total channels");
 		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
-		config.num_channels = 15
+		config.num_channels = channel_count
 		config.target_channels = 6
-		build_and_train("stacked_training_1", config)
-
-	for _ in range(num_trials_each):
-		# Run an experiment with two different layered targets:
-		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
-		config.num_channels = 18
-		config.target_channels = 6
-		build_and_train("stacked_training_1", config)
+		build_and_train("stacked_training_2", config)
 
 def main():
 	comparing_stacked_vs_separate()
