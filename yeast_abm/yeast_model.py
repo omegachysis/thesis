@@ -45,6 +45,13 @@ class ProteinNetwork(object):
 		as the training loss. """
 		return tf.reduce_mean(tf.square(s - target))
 
+	@staticmethod
+	def loss_snapshots(s_snapshots, target_snapshots):
+		loss = 0
+		for s, target in zip(s_snapshots, target_snapshots):
+			loss += ProteinNetwork.loss(s, target)
+		return loss
+
 	def to_dataframe(self, s):
 		rows = []
 		for i, value in enumerate(s):
@@ -52,24 +59,44 @@ class ProteinNetwork(object):
 		df = pd.DataFrame(rows, columns=["protein", "activation"])
 		return df
 
-	def train_step(self, s0, target, num_ticks):
+	def run_snapshots(self, s0, time_segments=[]):
+		""" Pass in a list of time step amounts to run 
+		the model for each of those segments, producing the output
+		at each snapshot of time at the end of each segment. """
+		res = []
+		s = s0
+		for num_ticks in time_segments:
+			s = self.run_for_ticks(s, num_ticks)
+			res.append(s)
+		return res
+
+	def train(self, s0, targets=[], time_segments=[]):
 		""" Return the loss from this training step. """
+		assert len(targets) == len(time_segments)
 		with tf.GradientTape() as tape:
-			sf = self.run_for_ticks(s0, num_ticks)
-			loss = self.loss(sf, target)
+			snapshots = self.run_snapshots(s0, time_segments)
+			loss = self.loss_snapshots(snapshots, targets)
 		grads = tape.gradient(loss, self.nn.trainable_variables)
 		self.optimizer.apply_gradients(zip(grads, self.nn.trainable_variables))
 		return loss
 
 def main():
 	network = ProteinNetwork(["test1", "test2", "test3", "test4"])
+	time_segments = [10, 10, 10, 10]
 	s0 = network.zeros()
-	for i in range(100):
-		print("Train step", i)
-		loss = network.train_step(s0, target=network.ones(), num_ticks=10)
+	targets = [
+		[1., 0., 0., 0.],
+		[0., 1., 0., 0.],
+		[0., 0., 1., 0.],
+		[0., 0., 0., 1.],
+	]
+
+	for _ in range(10):
+		loss = 0.
+		for _ in range(1000):
+			loss = network.train(s0, targets, time_segments)
 		print("Loss=", loss.numpy())
-	s = s0
-	for i in range(10):
-		display(network.to_dataframe(s))
-		s = network.tick_once(s)
-	display(network.to_dataframe(s))
+
+	snapshots = network.run_snapshots(s0, time_segments)
+	for snapshot in snapshots:
+		display(network.to_dataframe(snapshot))
