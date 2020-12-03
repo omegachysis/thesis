@@ -81,22 +81,32 @@ class ProteinNetwork(object):
 		return loss
 
 def main():
-	network = ProteinNetwork(["test1", "test2", "test3", "test4"])
-	time_segments = [10, 10, 10, 10]
+	network = ProteinNetwork([
+		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
+	time_segments = [10 for _ in range(9)]
 	s0 = network.zeros()
 	targets = [
-		[1., 0., 0., 0.],
-		[0., 1., 0., 0.],
-		[0., 0., 1., 0.],
-		[0., 0., 0., 1.],
+		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
+		[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
+		[0., 1.,    0., 0., 0., 0.,   1.,    0., 0.],	# G2
+		[0., 1.,    0., 0., 0., 0.,   0.,    1., 0.],	# G2
+		[0., 1.,    0., 0., 0., 1.,   0.,    1., 0.],	# G2
+		[0., 1.,    0., 0., 1., 1.,   0.,    1., 0.],	# G2
+		[0., 0.,    0., 0., 1., 0.,   0.,    1., 1.],	# M
+		[0., 0.,    1., 1., 0., 0.,   1.,    0., 1.],	# M
+		[0., 0.,    1., 1., 0., 0.,   1.,    0., 0.],	# G1
 	]
 
-	for _ in range(10):
-		loss = 0.
-		for _ in range(1000):
-			loss = network.train(s0, targets, time_segments)
-		print("Loss=", loss.numpy())
+	for i in range(len(time_segments)):
+		print("Doing", i+1, "segments")
+		for _ in range(10):
+			loss = 0.0
+			for _ in range(100):
+				loss = network.train(s0, targets[:i+1], time_segments[:i+1])
+			print("Loss=", loss.numpy())
 
-	snapshots = network.run_snapshots(s0, time_segments)
-	for snapshot in snapshots:
-		display(network.to_dataframe(snapshot))
+		snapshots = network.run_snapshots(s0, time_segments[:i+1])
+		for snapshot in snapshots[:i+1]:
+			display(network.to_dataframe(snapshot))
+
+
