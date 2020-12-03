@@ -15,7 +15,7 @@ class ProteinNetwork(object):
 			# Input layer that takes in each protein:
 			tf.keras.layers.Input(shape=(len(node_names),)),
 			# Hidden layer that simulates interactions between proteins:
-			tf.keras.layers.Dense(64, activation="relu"),
+			tf.keras.layers.Dense(512, activation="relu"),
 			# Output layer that produces change in each protein's activation amount:
 			tf.keras.layers.Dense(len(node_names), activation=None),
 		])
@@ -55,7 +55,7 @@ class ProteinNetwork(object):
 	def to_dataframe(self, s):
 		rows = []
 		for i, value in enumerate(s):
-			rows.append([self.names[i], float(value)])
+			rows.append([self.names[i], round(float(value), 3)])
 		df = pd.DataFrame(rows, columns=["protein", "activation"])
 		return df
 
@@ -83,7 +83,7 @@ class ProteinNetwork(object):
 def main():
 	network = ProteinNetwork([
 		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
-	time_segments = [10 for _ in range(9)]
+	time_segments = [20 for _ in range(9)]
 	s0 = network.zeros()
 	targets = [
 		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
@@ -99,9 +99,10 @@ def main():
 
 	for i in range(len(time_segments)):
 		print("Doing", i+1, "segments")
-		for _ in range(10):
-			loss = 0.0
-			for _ in range(100):
+		target_loss = 0.1
+		loss = 9999.9
+		while loss > target_loss:
+			for _ in range(50):
 				loss = network.train(s0, targets[:i+1], time_segments[:i+1])
 			print("Loss=", loss.numpy())
 
