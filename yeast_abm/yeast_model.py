@@ -26,10 +26,12 @@ class ProteinNetwork(object):
 
 		self.optimizer = tf.keras.optimizers.Adam()
 
-	def ones(self):
-		return tf.ones(shape=(len(self.names,)))
+	def set_activation(self, x, protein: str, activation: float):
+		idx = self.names.index(protein)
+		x[idx] = activation
+
 	def zeros(self):
-		return tf.zeros(shape=(len(self.names,)))
+		return [0.0 for protein in self.names]
 
 	@tf.function
 	def tick_once(self, x):
@@ -66,7 +68,7 @@ class ProteinNetwork(object):
 		the model for each of those segments, producing the output
 		at each snapshot of time at the end of each segment. """
 		res = []
-		s = s0
+		s = tf.constant(s0)
 		for num_ticks in time_segments:
 			s = self.run_for_ticks(s, num_ticks)
 			res.append(s)
@@ -103,52 +105,76 @@ class TrainingModel(object):
 		loss = self.network.train(s0, self.targets[start_idx : end_idx],
 			self.time_segments[start_idx : end_idx])
 		return loss
+	
+	def sample_an_interaction(self, protein1: str, protein2: str, num_steps: int):
+		""" Create an interaction table between two proteins, testing 
+		the two in isolation in the four different activation configurations 
+		they could be in. """
+		for p1_activation in [0., 1.]:
+			for p2_activation in [0., 1.]:
+				print(" ---- INTERACTION ---- ")
+
+				s0 = self.network.zeros()
+				self.network.set_activation(s0, protein1, p1_activation)
+				self.network.set_activation(s0, protein2, p2_activation)
+				ss = self.network.run_snapshots(s0, [0] + [1 for _ in range(num_steps)])
+				for s in ss:
+					display(self.network.to_dataframe(s))
 
 def main():
-	config = dict(
-		num_stages=9, num_trials=10, train_type="Graduated Segments w/ Segment Isolation"
-	)
-	wandb.init(project="neural-cellular-automata", group="yeast_model_1", config=config)
+	# config = dict(
+	# 	num_stages=9, num_trials=10, train_type="Graduated Segments w/ Segment Isolation"
+	# )
+	# wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
 
-	times = []
-	for i in range(config['num_trials']):
-		network = ProteinNetwork([
-			"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
-		s0 = network.zeros()
-		targets = [
-			[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
-			[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
-			[0., 1.,    0., 0., 0., 0.,   1.,    0., 0.],	# G2
-			[0., 1.,    0., 0., 0., 0.,   0.,    1., 0.],	# G2
-			[0., 1.,    0., 0., 0., 1.,   0.,    1., 0.],	# G2
-			[0., 1.,    0., 0., 1., 1.,   0.,    1., 0.],	# G2
-			[0., 0.,    0., 0., 1., 0.,   0.,    1., 1.],	# M
-			[0., 0.,    1., 1., 0., 0.,   1.,    0., 1.],	# M
-			[0., 0.,    1., 1., 0., 0.,   1.,    0., 0.],	# G1
-		]
-		assert(len(targets) == config['num_stages'])
-		time_segments = [5 for _ in targets]
+	network = ProteinNetwork([
+		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
+	s0 = network.zeros()
+	targets = [
+		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
+		[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
+		# [0., 1.,    0., 0., 0., 0.,   1.,    0., 0.],	# G2
+		# [0., 1.,    0., 0., 0., 0.,   0.,    1., 0.],	# G2
+		# [0., 1.,    0., 0., 0., 1.,   0.,    1., 0.],	# G2
+		# [0., 1.,    0., 0., 1., 1.,   0.,    1., 0.],	# G2
+		# [0., 0.,    0., 0., 1., 0.,   0.,    1., 1.],	# M
+		# [0., 0.,    1., 1., 0., 0.,   1.,    0., 1.],	# M
+		# [0., 0.,    1., 1., 0., 0.,   1.,    0., 0.],	# G1
+	]
+	# assert(len(targets) == config['num_stages'])
+	time_segments = [
+		5, # G1
+		5, # S
+		# 7, # G2
+		# 7, # G2
+		# 7, # G2
+		# 7, # G2
+		# 3, # M
+		# 3, # M
+		# 3, # G1
+	]
 
-		model = TrainingModel(s0, time_segments, targets, network)
+	model = TrainingModel(s0, time_segments, targets, network)
 
-		start = time.time()
-		for i in range(len(time_segments)):
-			print("Doing", i+1, "segments")
-			target_loss = 0.1
-			loss = 9999.9
-			while loss > target_loss:
-				# Isolated segment:
-				# for _ in range(10):
-				# 	model.train(i, i+1)
+	start = time.time()
+	for i in range(len(time_segments)):
+		print("Doing", i+1, "segments")
+		target_loss = 0.01
+		loss = 9999.9
+		while loss > target_loss:
+			# Isolated segment:
+			# for _ in range(10):
+			# 	model.train(i, i+1)
 
-				# Graduated segments:
-				for _ in range(50):
-					loss = model.train(0, i+1)
-				print("Loss=", loss.numpy())
+			# Graduated segments:
+			for _ in range(50):
+				loss = model.train(0, i+1)
+			print("Loss=", loss.numpy())
 
-		t = time.time() - start
-		print(t, "seconds to train graduated segments")
-		times.append(t)
-	
-	print("Total training time: ", sum(times))
-	wandb.run.summary['mean_training_time'] = sum(times) / len(times)
+	t = time.time() - start
+	print(t, "seconds to train graduated segments")
+
+	model.display()
+
+	print("Sampling interaction between SK and Ste9:")
+	model.sample_an_interaction("SK", "Ste9", num_steps=3)
