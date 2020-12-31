@@ -1,5 +1,6 @@
 import os
 import wandb
+import glob
 from typing import Tuple
 
 from config import *
@@ -35,8 +36,6 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 	print("Target state:")
 	ca.display(xf)
 
-	interval_seconds = config.training_seconds / config.num_sample_runs
-
 	start = time.time()
 
 	def save_sample_run(i: int, lf: int):
@@ -54,7 +53,8 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 
 	save_sample_run(0, config.lifetime)
 
-	for i in range(config.num_sample_runs):
+	i = 0
+	while not training.is_done():
 		if config.use_growing_square:
 			lifetime = (config.lifetime // config.num_sample_runs) * (i+1)
 			target_size = (config.size // config.num_sample_runs) * (i+1)
@@ -76,16 +76,18 @@ def build_and_train(group: str, config: Config, ca_modifier_fn=None,
 			return mse + laplace_err
 
 		training.run(x0_fn, xf_fn, lifetime, loss_fn, 
-			config.target_channels, max_seconds=interval_seconds)
+			config.target_channels, max_seconds=config.sampling_interval)
+		
 
 		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
 		if ca.perception_model is not None:
 			ca.perception_model.save(os.path.join(wandb.run.dir, f"perceive_model_{i}.h5"))
 
 		final_state = save_sample_run(i+1, lifetime)[None, ...]
-		
 		best_so_far = min(training.loss_hist)
 		print("Best loss: ", best_so_far)
+
+		i += 1
 
 	elapsed_total = time.time() - start
 	print("Total elapsed time:", elapsed_total, "seconds")
@@ -163,5 +165,25 @@ def comparing_stacked_vs_separate():
 		config.target_channels = 6
 		build_and_train("stacked_training_2", config)
 
+def final_replicated():
+	""" In this experiment we just run the standard training algorithm 
+	on all the final test images from the image database. """
+
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 18
+	config.target_channels = 3
+	config.sampling_interval = 100
+	config.target_loss = 0.01
+	config.lifetime = 64
+	config.size = 64
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		build_and_train("final_replicated", config)
+
 def main():
-	comparing_stacked_vs_separate()
+	final_replicated()

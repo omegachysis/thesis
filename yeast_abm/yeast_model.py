@@ -127,10 +127,10 @@ class TrainingModel(object):
 		display(df)
 
 def main():
-	# config = dict(
-	# 	num_stages=9, num_trials=10, train_type="Graduated Segments w/ Segment Isolation"
-	# )
-	# wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
+	config = dict(
+		num_stages=9, num_trials=1, train_type="Graduated Segments"
+	)
+	wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
 
 	network = ProteinNetwork([
 		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
@@ -145,7 +145,7 @@ def main():
 		[0., 0.,    1., 1., 0., 0.,   1.,    0., 1.],	# M
 		[0., 0.,    1., 1., 0., 0.,   1.,    0., 0.],	# G1
 	]
-	# assert(len(targets) == config['num_stages'])
+	
 	time_segments = [
 		5, # G1
 		5, # S
@@ -173,6 +173,7 @@ def main():
 			# Graduated segments:
 			for _ in range(50):
 				loss = model.train(0, i+1)
+				wandb.log({"loss": loss})
 			print("Loss=", loss.numpy())
 
 	t = time.time() - start

@@ -43,7 +43,8 @@ class CellularAutomata(keras.Model):
 
 		self.model = keras.Sequential([
 			keras.layers.Conv2D(self.hidden_layer_size, kernel_size=1, activation=tf.nn.relu),
-			keras.layers.Conv2D(self.num_channels, kernel_size=1, activation=None)
+			keras.layers.Conv2D(self.num_channels, kernel_size=1, activation=None,
+				kernel_initializer=tf.zeros_initializer())
 		])
 
 		# Compile the model:
