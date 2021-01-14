@@ -90,15 +90,11 @@ class Config(object):
 		self.num_channels = 15
 		self.target_channels = 3
 		self.layer1_size = 256
-		self.perceive_layer_size = 0
-		self.perception_kernel_size = 0
 		self.learning_rate = 3.5e-3
 		self.epsilon = 1.0e-5
-		self.sampling_interval = 5
 		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_center_black_dot'
 		self.target_state = 'sconf_image("lenna.png")'
-		self.loss_fn = 'loss_rmse'
 		self.lifetime = 64
 		self.target_loss = 0.01
-		self.use_growing_square = False
+		self.growing_jump = 0

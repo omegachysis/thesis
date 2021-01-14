@@ -7,165 +7,67 @@ from config import *
 from ca import *
 from training import *
 
-class TrainedCa(object):
-	def __init__(self, ca: CellularAutomata, training: Training):
-		self.ca = ca
-		self.training = training
-
-def build_and_train(group: str, config: Config, ca_modifier_fn=None,
-	use_trained_ca: TrainedCa=None) -> TrainedCa:
+def build_and_train(group: str, config: Config):
 	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
-	perception_kernel = None
-	if config.perception_kernel_size == 0 or config.perceive_layer_size == 0:
-		perception_kernel = kernel_sobel()
-	ca = CellularAutomata(config, perception_kernel)
-	if use_trained_ca is not None:
-		ca.copy_weights_from(use_trained_ca.ca)
-
-	if ca_modifier_fn: ca_modifier_fn(ca)
-
+	ca = CellularAutomata(config, kernel_sobel())
 	training = Training(ca=ca, config=config)
 
 	x0 = eval(config.initial_state)(ca)
 	xf = eval(config.target_state)(ca)
-	#loss_fn = eval(config.loss_fn)(xf)
 	x0_fn = lambda: x0
 	xf_fn = lambda: xf
 
 	print("Target state:")
 	ca.display(xf)
 
+	window_size = config.growing_jump
+	if window_size <= 0:
+		window_size = config.size
+
 	start = time.time()
+	
+	while True:
+		print("Window size: ", window_size)
+		lifetime = window_size
 
-	def save_sample_run(i: int, lf: int):
-		sample_run = training.do_sample_run(x0_fn, lf)
-		gif_path = f"temp/sample_run_{i}.gif"
-		with open(gif_path, 'wb') as gif:
-			gif.write(ca.create_gif(sample_run))
-		final_img = ca.to_image(sample_run[-1])
-		wandb.log({
-			f""
-			f"final_state": wandb.Image(final_img),
-			f"video": wandb.Video(gif_path)},
-			step=len(training.loss_hist))
-		return sample_run[-1]
-
-	save_sample_run(0, config.lifetime)
-
-	i = 0
-	while not training.is_done():
-		if config.use_growing_square:
-			lifetime = (config.lifetime // config.num_sample_runs) * (i+1)
-			target_size = (config.size // config.num_sample_runs) * (i+1)
-		else:
-			lifetime = config.lifetime
-			target_size = config.size
-		a = config.size // 2 - target_size // 2
-		b = config.size // 2 + target_size // 2
-		print("Lifetime: ", lifetime)
-		print("Target size: ", target_size)
+		a = config.size // 2 - window_size // 2
+		b = config.size // 2 + window_size // 2
+		a = max(0, a)
+		b = min(config.size - 1, b)
 
 		def loss_fn(x, channel):
 			x = x[:, a:b, a:b, channel:channel+1]
 			f = xf[None, a:b, a:b, channel:channel+1]
 			lx = CellularAutomata.laplacian(x)
 			lf = CellularAutomata.laplacian(f)
-			laplace_err = tf.reduce_mean(tf.square(lx - lf))
-			mse = tf.reduce_mean(tf.square(x - f))
-			return mse + laplace_err
+			# laplace_err = tf.reduce_mean(tf.square(lx - lf))
+			rmse = tf.sqrt(tf.reduce_mean(tf.square(x - f)))
+			return rmse
 
-		training.run(x0_fn, xf_fn, lifetime, loss_fn, 
-			config.target_channels, max_seconds=config.sampling_interval)
-		
+		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels)
 
-		ca.model.save(os.path.join(wandb.run.dir, f"model_{i}.h5"))
-		if ca.perception_model is not None:
-			ca.perception_model.save(os.path.join(wandb.run.dir, f"perceive_model_{i}.h5"))
-
-		final_state = save_sample_run(i+1, lifetime)[None, ...]
-		best_so_far = min(training.loss_hist)
-		print("Best loss: ", best_so_far)
-
-		i += 1
+		if window_size >= config.size:
+			break
+		window_size += config.growing_jump
 
 	elapsed_total = time.time() - start
 	print("Total elapsed time:", elapsed_total, "seconds")
-
 	wandb.run.summary["total_seconds"] = elapsed_total
 
-	return TrainedCa(ca, training)
+	sample_run = training.do_sample_run(x0_fn, config.lifetime)
+	gif_path = f"temp/sample_run.gif"
+	with open(gif_path, 'wb') as gif:
+		gif.write(ca.create_gif(sample_run))
+	final_img = ca.to_image(sample_run[-1])
+	wandb.log({
+		f""
+		f"final_state": wandb.Image(final_img),
+		f"video": wandb.Video(gif_path)},
+		step=len(training.loss_hist))
+	return sample_run[-1]
 
-def multi_image_learning():
-	config = Config()
-	config.layer1_size = 256
-	config.num_channels = 15
-	config.target_channels = 3
-	config.training_seconds = 60
-	#config.target_loss = 0.01
-	config.num_sample_runs = 3
-	config.lifetime = 50
-	config.size = 25
-	config.initial_state = 'sconf_center_black_dot'
-	config.edge_strategy = 'EdgeStrategy.TF_SAME'
-	config.use_growing_square = False
-
-	# Sanity check that copying models works:
-
-	config.target_state = 'sconf_image("lenna.png")'
-	res1 = build_and_train("multi_image", config)
-
-	config.target_state = 'sconf_image("nautilus.png")'
-	res2 = build_and_train("multi_image", config, use_trained_ca=res1)
-
-	config.target_state = 'sconf_image("lenna.png")'
-	res3 = build_and_train("multi_image", config, use_trained_ca=res1)
-
-def comparing_stacked_vs_separate():
-	""" In this experiment we check if learning multiple images in parallel
-	takes less time than learning the images separately. """
-
-	config = Config()
-	config.layer1_size = 350
-	config.num_channels = 15
-	config.target_channels = 3
-	config.training_seconds = 999
-	config.target_loss = 0.01
-	config.num_sample_runs = 8
-	config.lifetime = 64
-	config.size = 32
-	config.initial_state = 'sconf_center_black_dot'
-	config.edge_strategy = 'EdgeStrategy.TF_SAME'
-	config.use_growing_square = True
-	config.target_state = 'sconf_imagestack("lenna.png", "lenna.png")'
-
-	num_trials_each = 1
-
-	# First, we'll form a lenna on its own with anywhere from 6 to 30 channels.
-	for channel_count in range(6,30+1):
-		print(f"Lenna with {channel_count} total channels");
-		config.target_state = 'sconf_image("lenna.png")'
-		config.num_channels = channel_count
-		config.target_channels = 3
-		build_and_train("stacked_training_2", config)
-
-	# Next, we'll form a nautilus on its own with anywhere from 6 to 30 channels.
-	for channel_count in range(6,30+1):
-		print(f"Nautilus with {channel_count} total channels");
-		config.target_state = 'sconf_image("nautilus.png")'
-		config.num_channels = channel_count
-		config.target_channels = 3
-		build_and_train("stacked_training_2", config)
-
-	# Finally, we'll form a lenna/nautilus stack in parallel with anywhere from 9 to 30 channels.
-	for channel_count in range(9,30+1):
-		print(f"Lenna/Nautilus stack with {channel_count} total channels");
-		config.target_state = 'sconf_imagestack("lenna.png", "nautilus.png")'
-		config.num_channels = channel_count
-		config.target_channels = 6
-		build_and_train("stacked_training_2", config)
-
-def final_replicated():
+def final_plain():
 	""" In this experiment we just run the standard training algorithm 
 	on all the final test images from the image database. """
 
@@ -173,17 +75,37 @@ def final_replicated():
 	config.layer1_size = 256
 	config.num_channels = 18
 	config.target_channels = 3
-	config.sampling_interval = 100
 	config.target_loss = 0.01
-	config.lifetime = 64
-	config.size = 64
+	config.lifetime = 32
+	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.growing_jump = 0
 
 	for path in glob.glob("images/final/*.png"):
 		img_name = os.path.basename(path)
 		config.target_state = f'sconf_image("final/{img_name}")'
-		build_and_train("final_replicated", config)
+		build_and_train("final_plain", config)
+
+def final_center_growing():
+	""" In this experiment we compare various center growing squares """
+
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 18
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.lifetime = 32
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+
+	for jump in range(1,6):
+		config.growing_jump = jump
+		for path in glob.glob("images/final/*.png"):
+			img_name = os.path.basename(path)
+			config.target_state = f'sconf_image("final/{img_name}")'
+			build_and_train("final_center_growing", config)
 
 def main():
-	final_replicated()
+	final_plain()
