@@ -21,8 +21,8 @@ def build_and_train(group: str, config: Config):
 	print("Target state:")
 	ca.display(xf)
 
-	window_size = config.growing_jump
-	if window_size <= 0:
+	window_size = 3
+	if config.growing_jump <= 0:
 		window_size = config.size
 
 	start = time.time()
@@ -73,9 +73,9 @@ def final_plain():
 
 	config = Config()
 	config.layer1_size = 256
-	config.num_channels = 18
+	config.num_channels = 15
 	config.target_channels = 3
-	config.target_loss = 0.01
+	config.target_loss = 0.005
 	config.lifetime = 32
 	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
@@ -85,7 +85,8 @@ def final_plain():
 	for path in glob.glob("images/final/*.png"):
 		img_name = os.path.basename(path)
 		config.target_state = f'sconf_image("final/{img_name}")'
-		build_and_train("final_plain", config)
+		build_and_train("test1", config)
+		break
 
 def final_center_growing():
 	""" In this experiment we compare various center growing squares """
@@ -99,13 +100,14 @@ def final_center_growing():
 	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.growing_jump = 3
 
-	for jump in range(1,6):
-		config.growing_jump = jump
-		for path in glob.glob("images/final/*.png"):
-			img_name = os.path.basename(path)
-			config.target_state = f'sconf_image("final/{img_name}")'
-			build_and_train("final_center_growing", config)
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		build_and_train("test1", config)
+		break
 
 def main():
 	final_plain()
+	final_center_growing()
