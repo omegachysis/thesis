@@ -75,7 +75,7 @@ def final_plain():
 	config.layer1_size = 256
 	config.num_channels = 15
 	config.target_channels = 3
-	config.target_loss = 0.005
+	config.target_loss = 0.01
 	config.lifetime = 32
 	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
@@ -93,14 +93,14 @@ def final_center_growing():
 
 	config = Config()
 	config.layer1_size = 256
-	config.num_channels = 18
+	config.num_channels = 15
 	config.target_channels = 3
 	config.target_loss = 0.01
 	config.lifetime = 32
 	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
-	config.growing_jump = 3
+	config.growing_jump = 10
 
 	for path in glob.glob("images/final/*.png"):
 		img_name = os.path.basename(path)
@@ -109,5 +109,6 @@ def final_center_growing():
 		break
 
 def main():
-	final_plain()
-	final_center_growing()
+	for i in range(10):
+		final_plain()
+		final_center_growing()
