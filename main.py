@@ -85,8 +85,7 @@ def final_plain():
 	for path in glob.glob("images/final/*.png"):
 		img_name = os.path.basename(path)
 		config.target_state = f'sconf_image("final/{img_name}")'
-		build_and_train("test1", config)
-		break
+		build_and_train("final_compare_gradual", config)
 
 def final_center_growing():
 	""" In this experiment we compare various center growing squares """
@@ -105,8 +104,7 @@ def final_center_growing():
 	for path in glob.glob("images/final/*.png"):
 		img_name = os.path.basename(path)
 		config.target_state = f'sconf_image("final/{img_name}")'
-		build_and_train("test1", config)
-		break
+		build_and_train("final_compare_gradual", config)
 
 def main():
 	for i in range(10):
