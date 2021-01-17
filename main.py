@@ -135,11 +135,11 @@ def final_stacked_compare():
 	config.num_channels = 15
 	config.target_channels = 3
 	config.target_loss = 0.01
-	config.lifetime = 10
-	config.size = 10
+	config.lifetime = 32
+	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
-	config.growing_jump = 3
+	config.growing_jump = 10
 
 	imgs = list(glob.glob("images/final/*.png"))
 	i = 0
