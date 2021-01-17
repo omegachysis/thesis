@@ -8,7 +8,7 @@ from ca import *
 from training import *
 
 def build_and_train(group: str, config: Config):
-	wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
+	run = wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
 	ca = CellularAutomata(config, kernel_sobel())
 	training = Training(ca=ca, config=config)
@@ -65,7 +65,8 @@ def build_and_train(group: str, config: Config):
 		f"final_state": wandb.Image(final_img),
 		f"video": wandb.Video(gif_path)},
 		step=len(training.loss_hist))
-	return sample_run[-1]
+
+	run.finish()
 
 def final_plain():
 	""" In this experiment we just run the standard training algorithm 
@@ -134,26 +135,35 @@ def final_stacked_compare():
 	config.num_channels = 15
 	config.target_channels = 3
 	config.target_loss = 0.01
-	config.lifetime = 32
-	config.size = 32
+	config.lifetime = 10
+	config.size = 10
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
-	config.growing_jump = 10
+	config.growing_jump = 3
 
-	for path1 in glob.glob("images/final/*.png"):
-		for path2 in glob.glob("images/final/*.png"):
+	imgs = list(glob.glob("images/final/*.png"))
+	i = 0
+	while i < len(imgs):
+		j = i + 1
+		while j < len(imgs):
+			path1 = imgs[i]
+			path2 = imgs[j]
+
 			img1 = "final/" + os.path.basename(path1)
 			img2 = "final/" + os.path.basename(path2)
 
 			config.target_channels = 3
-			config.target_state = f'sconf_image("final/{img1}")'
+			config.target_state = f'sconf_image("{img1}")'
 			build_and_train('test', config)
-			config.target_state = f'sconf_image("final/{img2}")'
+			config.target_state = f'sconf_image("{img2}")'
 			build_and_train('test', config)
 
 			config.target_channels = 6
-			config.target_state = f'sconf_imagestack({img1}, {img2})'
+			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
 			build_and_train('test', config)
+
+			j += 1
+		i += 1
 
 def main():
 	final_stacked_compare()
