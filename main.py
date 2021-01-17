@@ -154,13 +154,13 @@ def final_stacked_compare():
 
 			config.target_channels = 3
 			config.target_state = f'sconf_image("{img1}")'
-			build_and_train('test', config)
+			build_and_train('final_compare_stacked', config)
 			config.target_state = f'sconf_image("{img2}")'
-			build_and_train('test', config)
+			build_and_train('final_compare_stacked', config)
 
 			config.target_channels = 6
 			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
-			build_and_train('test', config)
+			build_and_train('final_compare_stacked', config)
 
 			j += 1
 		i += 1
