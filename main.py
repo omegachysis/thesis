@@ -106,7 +106,57 @@ def final_center_growing():
 		config.target_state = f'sconf_image("final/{img_name}")'
 		build_and_train("final_compare_gradual", config)
 
+def final_center_growing():
+	""" In this experiment we compare various center growing squares """
+
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 15
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.lifetime = 32
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.growing_jump = 10
+
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		build_and_train("final_compare_gradual", config)
+
+def final_stacked_compare():
+	""" Compares stacked learning with plain learning
+	separately. """
+
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 15
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.lifetime = 32
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.growing_jump = 10
+
+	for path1 in glob.glob("images/final/*.png"):
+		for path2 in glob.glob("images/final/*.png"):
+			img1 = "final/" + os.path.basename(path1)
+			img2 = "final/" + os.path.basename(path2)
+
+			config.target_channels = 3
+			config.target_state = f'sconf_image("final/{img1}")'
+			build_and_train('test', config)
+			config.target_state = f'sconf_image("final/{img2}")'
+			build_and_train('test', config)
+
+			config.target_channels = 6
+			config.target_state = f'sconf_imagestack({img1}, {img2})'
+			build_and_train('test', config)
+
 def main():
-	for i in range(10):
-		final_plain()
-		final_center_growing()
+	final_stacked_compare()
+
+if __name__ == "__main__":
+	main()
