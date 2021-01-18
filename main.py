@@ -142,13 +142,9 @@ def final_stacked_compare():
 	config.growing_jump = 10
 
 	imgs = list(glob.glob("images/final/*.png"))
-	i = 0
-	while i < len(imgs):
-		j = i + 1
-		while j < len(imgs):
-			path1 = imgs[i]
-			path2 = imgs[j]
 
+	for path1 in imgs:
+		for path2 in imgs:
 			img1 = "final/" + os.path.basename(path1)
 			img2 = "final/" + os.path.basename(path2)
 
@@ -161,9 +157,6 @@ def final_stacked_compare():
 			config.target_channels = 6
 			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
 			build_and_train('final_compare_stacked', config)
-
-			j += 1
-		i += 1
 
 def main():
 	final_stacked_compare()
