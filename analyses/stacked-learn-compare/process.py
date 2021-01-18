@@ -1,0 +1,57 @@
+from math import sqrt
+import csv
+from os import stat_result
+from scipy import stats
+import statistics
+
+non_stacked_times = {}
+stacked_times = {}
+
+with open("data.csv") as csvfile:
+	reader = csv.reader(csvfile)
+	header = next(reader)
+		# "Name","total_seconds","target_state"
+	target_col = header.index("target_state")
+	time_col = header.index("total_seconds")
+	for row in reader:
+		target = row[target_col]
+		time = row[time_col]
+		if time == '': continue
+		time = float(time)
+		
+		if target.startswith("sconf_imagestack("):
+			img1, img2 = eval(target.replace("sconf_imagestack", ""))
+			if (img1, img2) not in stacked_times:
+				stacked_times[(img1, img2)] = []
+			stacked_times[(img1, img2)].append(time)
+		elif target.startswith("sconf_image("):
+			img = eval(target.replace("sconf_image",""))
+			if img not in non_stacked_times:
+				non_stacked_times[img] = []
+			non_stacked_times[img].append(time)
+		else:
+			raise Exception()
+
+non_stacked_avgs = {}
+for k,v in non_stacked_times.items():
+	non_stacked_avgs[k] = statistics.mean(v)
+
+stacked_avgs = {}
+for k,v in stacked_times.items():
+	stacked_avgs[k] = statistics.mean(v)
+
+# Analyze speed difference between stacked and single combined.
+non_stacked_dist = []
+stacked_dist = []
+for k,v in stacked_avgs.items():
+	img1, img2 = k
+	sep_time = non_stacked_avgs[img1] + non_stacked_avgs[img2]
+	non_stacked_dist.append(sep_time)
+	stacked_dist.append(v)
+
+print("Stats for non stacked learning:")
+print(stats.describe(non_stacked_dist))
+print("Stats for stacked learning:")
+print(stats.describe(stacked_dist))
+print("T test:")
+print(stats.ttest_ind(non_stacked_dist, stacked_dist))
