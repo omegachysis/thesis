@@ -144,16 +144,15 @@ def final_stacked_compare():
 	imgs = list(glob.glob("images/final/*.png"))
 
 	for path1 in imgs:
-		for path2 in imgs:
-			img1 = "final/" + os.path.basename(path1)
-			img2 = "final/" + os.path.basename(path2)
 
+		img1 = "final/" + os.path.basename(path1)
+		for _ in range(5):
 			config.target_channels = 3
 			config.target_state = f'sconf_image("{img1}")'
 			build_and_train('final_compare_stacked', config)
-			config.target_state = f'sconf_image("{img2}")'
-			build_and_train('final_compare_stacked', config)
 
+		for path2 in imgs:
+			img2 = "final/" + os.path.basename(path2)
 			config.target_channels = 6
 			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
 			build_and_train('final_compare_stacked', config)
