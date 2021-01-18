@@ -65,9 +65,29 @@ for k,v in stacked_avgs.items():
 	non_stacked_dist.append(sep_time)
 	stacked_dist.append(v)
 
+print("-" * 80)
 print("Stats for non stacked learning:")
 print(stats.describe(non_stacked_dist))
 print("Stats for stacked learning:")
 print(stats.describe(stacked_dist))
 print("T test:")
 print(stats.ttest_ind(non_stacked_dist, stacked_dist, equal_var=False))
+
+print("-" * 80)
+print("Averages across images in stacks")
+dist1 = []
+dist2 = []
+
+for img, sep_time in non_stacked_avgs.items():
+	times = []
+	for k,v in stacked_avgs.items():
+		if img in k:
+			times.append(v)
+	
+	dist1.append(sep_time)
+	dist2.append(statistics.mean(times))
+	print(img, sep_time, stats.describe(times))
+
+print("-" * 80)
+print("Correlation between separate time and average time in stacks:")
+print(stats.pearsonr(dist1, dist2))
