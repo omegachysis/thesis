@@ -40,6 +40,22 @@ stacked_avgs = {}
 for k,v in stacked_times.items():
 	stacked_avgs[k] = statistics.mean(v)
 
+# Check symmetry of stacked learning.
+asym_dist1 = []
+asym_dist2 = []
+for k,v in stacked_avgs.items():
+	img1, img2 = k
+	if img1 > img2: continue
+	if (img2, img1) in stacked_avgs:
+		asym_dist1.append(v)
+		asym_dist2.append(stacked_avgs[(img2, img1)])
+
+asym_diffs = [i - j for (i,j) in zip(asym_dist1, asym_dist2)]
+print("Asymmetric differences:")
+print(stats.describe(asym_diffs))
+print("Correlation of asymmetries:")
+print(stats.pearsonr(asym_dist1, asym_dist2))
+
 # Analyze speed difference between stacked and single combined.
 non_stacked_dist = []
 stacked_dist = []
@@ -54,4 +70,4 @@ print(stats.describe(non_stacked_dist))
 print("Stats for stacked learning:")
 print(stats.describe(stacked_dist))
 print("T test:")
-print(stats.ttest_ind(non_stacked_dist, stacked_dist))
+print(stats.ttest_ind(non_stacked_dist, stacked_dist, equal_var=False))
