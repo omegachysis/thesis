@@ -29,7 +29,7 @@ def build_and_train(group: str, config: Config):
 	
 	while True:
 		print("Window size: ", window_size)
-		lifetime = window_size
+		lifetime = window_size + 10
 
 		a = config.size // 2 - window_size // 2
 		b = config.size // 2 + window_size // 2
@@ -55,7 +55,7 @@ def build_and_train(group: str, config: Config):
 	print("Total elapsed time:", elapsed_total, "seconds")
 	wandb.run.summary["total_seconds"] = elapsed_total
 
-	sample_run = training.do_sample_run(x0_fn, config.lifetime)
+	sample_run = training.do_sample_run(x0_fn, config.size + 10)
 	gif_path = f"temp/sample_run.gif"
 	with open(gif_path, 'wb') as gif:
 		gif.write(ca.create_gif(sample_run))
@@ -82,25 +82,6 @@ def final_plain():
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 	config.growing_jump = 0
-
-	for path in glob.glob("images/final/*.png"):
-		img_name = os.path.basename(path)
-		config.target_state = f'sconf_image("final/{img_name}")'
-		build_and_train("final_compare_gradual", config)
-
-def final_center_growing():
-	""" In this experiment we compare various center growing squares """
-
-	config = Config()
-	config.layer1_size = 256
-	config.num_channels = 15
-	config.target_channels = 3
-	config.target_loss = 0.01
-	config.lifetime = 32
-	config.size = 32
-	config.initial_state = 'sconf_center_black_dot'
-	config.edge_strategy = 'EdgeStrategy.TF_SAME'
-	config.growing_jump = 10
 
 	for path in glob.glob("images/final/*.png"):
 		img_name = os.path.basename(path)
@@ -156,9 +137,32 @@ def final_stacked_compare():
 			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
 			build_and_train('final_compare_stacked', config)
 
+def final_gradual_compare_large():
+	""" In this experiment we compare various center growing squares """
+
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 15
+	config.target_channels = 3
+	config.target_loss = 0.025
+	config.size = 30
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.MIRROR'
+
+	while True:
+		for path in glob.glob("images/hard/*.png"):
+			img_name = os.path.basename(path)
+			for j in range(15):
+				config.target_state = f'sconf_image("hard/{img_name}")'
+				config.growing_jump = j
+				config.edge_strategy = 'EdgeStrategy.MIRROR'
+				build_and_train("compare_gradual_2", config)
+				config.edge_strategy = 'EdgeStrategy.TF_SAME'
+				build_and_train("compare_gradual_2", config)
+
+
 def main():
-	for _ in range(10):
-		final_stacked_compare()
+	final_gradual_compare_large()
 
 if __name__ == "__main__":
 	main()

@@ -16,10 +16,11 @@ class EdgeStrategy:
 	RANDOM = 3
 
 class CellularAutomata(keras.Model):
-	def __init__(self, config, perception_kernel):
+	def __init__(self, config, perception_kernel, img_size=None):
 		super().__init__()
 
-		self.img_size = config.size
+		if img_size is None: img_size = config.size
+		self.img_size = img_size
 		self.num_channels = config.num_channels
 		self.edge_strategy = eval(config.edge_strategy)
 		self.hidden_layer_size = config.layer1_size
