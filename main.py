@@ -144,21 +144,20 @@ def final_gradual_compare_large():
 	config.layer1_size = 256
 	config.num_channels = 15
 	config.target_channels = 3
-	config.target_loss = 0.025
-	config.size = 30
+	config.size = 32
+	config.target_loss = 0.01
 	config.initial_state = 'sconf_center_black_dot'
-	config.edge_strategy = 'EdgeStrategy.MIRROR'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 
 	while True:
 		for path in glob.glob("images/hard/*.png"):
 			img_name = os.path.basename(path)
-			for j in range(15):
-				config.target_state = f'sconf_image("hard/{img_name}")'
-				config.growing_jump = j
-				config.edge_strategy = 'EdgeStrategy.MIRROR'
-				build_and_train("compare_gradual_2", config)
-				config.edge_strategy = 'EdgeStrategy.TF_SAME'
-				build_and_train("compare_gradual_2", config)
+			for j in [3.5e-3, 5.0e-3]:
+				for i in [0, 10]:
+					config.target_state = f'sconf_image("hard/{img_name}")'
+					config.growing_jump = i
+					config.learning_rate = j
+					build_and_train("test2", config)
 
 
 def main():

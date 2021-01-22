@@ -91,7 +91,7 @@ class Config(object):
 		self.target_channels = 3
 		self.layer1_size = 256
 		self.learning_rate = 3.5e-3
-		self.epsilon = 1.0e-5
+		self.epsilon = 1.0e-7
 		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_center_black_dot'
 		self.target_state = 'sconf_image("lenna.png")'
