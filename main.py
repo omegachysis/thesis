@@ -30,6 +30,7 @@ def build_and_train(group: str, config: Config):
 	while True:
 		print("Window size: ", window_size)
 		lifetime = window_size + 10
+		print("Lifetime: ", lifetime)
 
 		a = config.size // 2 - window_size // 2
 		b = config.size // 2 + window_size // 2
@@ -145,19 +146,18 @@ def final_gradual_compare_large():
 	config.num_channels = 15
 	config.target_channels = 3
 	config.size = 30
-	config.target_loss = 0.002
+	config.target_loss = 0.01
 	config.learning_rate = 3.5e-3
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 
 	while True:
-		# for path in glob.glob("images/hard/*.png"):
-		# img_name = os.path.basename(path)
-		img_name = "arch.png"
-		for i in [0, 10, 15]:
-			config.target_state = f'sconf_image("hard/{img_name}")'
-			config.growing_jump = i
-			build_and_train("test2", config)
+		for path in glob.glob("images/final/*.png"):
+			img_name = os.path.basename(path)
+			for i in [0, 15]:
+				config.target_state = f'sconf_image("final/{img_name}")'
+				config.growing_jump = i
+				build_and_train("compare_gradual_9", config)
 
 
 def main():
