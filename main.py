@@ -14,43 +14,27 @@ def build_and_train(group: str, config: Config):
 	training = Training(ca=ca, config=config)
 
 	x0 = eval(config.initial_state)(ca)
-	xf = eval(config.target_state)(ca)
 	x0_fn = lambda: x0
-	xf_fn = lambda: xf
-
-	print("Target state:")
-	ca.display(xf)
-
-	window_size = 3
-	if config.growing_jump <= 0:
-		window_size = config.size
 
 	start = time.time()
-	
-	while True:
-		print("Window size: ", window_size)
-		lifetime = window_size + 10
+
+	for i in range(len(config.target_states)):
+		lifetime = config.target_states[i][0]
+		targets = config.target_states[:i+1]
+		print("Targets: ", targets)
 		print("Lifetime: ", lifetime)
 
-		a = config.size // 2 - window_size // 2
-		b = config.size // 2 + window_size // 2
-		a = max(0, a)
-		b = min(config.size - 1, b)
-
-		def loss_fn(x, channel):
-			x = x[:, a:b, a:b, channel:channel+1]
-			f = xf[None, a:b, a:b, channel:channel+1]
-			lx = CellularAutomata.laplacian(x)
-			lf = CellularAutomata.laplacian(f)
-			# laplace_err = tf.reduce_mean(tf.square(lx - lf))
-			rmse = tf.sqrt(tf.reduce_mean(tf.square(x - f)))
+		def loss_fn(xs, channel):
+			rmse = 0.0
+			for i, tstate in targets:
+				xf = eval(tstate)(ca)
+				x = xs[i]
+				x = x[:, :, :, channel:channel+1]
+				f = xf[None, :, :, channel:channel+1]
+				rmse += tf.sqrt(tf.reduce_mean(tf.square(x - f)))
 			return rmse
 
-		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels)
-
-		if window_size >= config.size:
-			break
-		window_size += config.growing_jump
+		training.run(x0_fn, lifetime, loss_fn, config.target_channels)
 
 	elapsed_total = time.time() - start
 	print("Total elapsed time:", elapsed_total, "seconds")
@@ -163,20 +147,16 @@ def companion_training():
 	config = Config()
 	config.layer1_size = 256
 	config.num_channels = 15
-	config.target_channels = 6
+	config.target_channels = 3
 	config.size = 32
 	config.target_loss = 0.01
 	config.learning_rate = 3.5e-3
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 	config.initial_state = 'sconf_center_black_dot'
 
-	while True:
-		config.target_state = 'sconf_image("arch.png")'
-		build_and_train("companion_posterize", config)
-
-		config.target_state = 'sconf_imagestack("arch.png", "arch_posterize.png")'
-		build_and_train("companion_posterize", config)
-
+	config.target_states = [
+		(15, 'sconf_image("arch_posterize.png")'), (31, 'sconf_image("arch.png")')]
+	build_and_train("companion_posterize", config)
 
 def main():
 	companion_training()

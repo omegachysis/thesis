@@ -15,15 +15,18 @@ class Training(object):
 		self.target_loss = config.target_loss
 
 	@tf.function
-	def train_step(self, x0, xf, lifetime, loss_fn, target_channels, lock_release: int=None):
+	def train_step(self, x0, lifetime, loss_fn, target_channels):
 		x = x0
 		with tf.GradientTape() as g:
-			for i in tf.range(lifetime):
-				#x = self.ca(x, lock_release is not None and i >= lock_release)
+			xs = []
+			xs.append(x)
+			for _ in range(lifetime):
 				x = self.ca(x)
+				xs.append(x)
+			
 			losses = []
 			for channel in range(target_channels):
-				losses.append(loss_fn(x, channel))
+				losses.append(loss_fn(xs, channel))
 			loss = tf.reduce_mean(losses)
 				
 		grads = g.gradient(loss, self.ca.model.trainable_variables)
@@ -74,7 +77,7 @@ class Training(object):
 	def is_done(self):
 		return self.loss_hist and self.loss_hist[-1] <= self.target_loss
 	
-	def run(self, x0, xf, lifetime: int, loss_fn, target_channels, 
+	def run(self, x0, lifetime: int, loss_fn, target_channels, 
 	max_seconds=None, max_plateau_len=None):
 		initial = loss = None
 		start = time.time()
@@ -99,10 +102,9 @@ class Training(object):
 					return
 					
 			initial = np.repeat(x0()[None, ...], 1, 0)
-			target = np.repeat(xf()[None, ...], 1, 0) if xf is not None else None
 
 			# Run training step:
-			_, losses = self.train_step(initial, target, lifetime, loss_fn, target_channels)
+			_, losses = self.train_step(initial, lifetime, loss_fn, target_channels)
 			loss = tf.reduce_mean(losses)
 
 			# Update best loss and increment plateau:
