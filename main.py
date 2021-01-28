@@ -145,8 +145,8 @@ def final_gradual_compare_large():
 	config.layer1_size = 256
 	config.num_channels = 15
 	config.target_channels = 3
-	config.size = 30
-	config.target_loss = 0.01
+	config.size = 50
+	config.target_loss = 0.025
 	config.learning_rate = 3.5e-3
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
@@ -154,14 +154,32 @@ def final_gradual_compare_large():
 	while True:
 		for path in glob.glob("images/final/*.png"):
 			img_name = os.path.basename(path)
-			for i in [0, 15]:
+			for i in [0, 10, 25]:
 				config.target_state = f'sconf_image("final/{img_name}")'
 				config.growing_jump = i
-				build_and_train("compare_gradual_9", config)
+				build_and_train("compare_gradual_10", config)
+
+def companion_training():
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 15
+	config.target_channels = 6
+	config.size = 32
+	config.target_loss = 0.01
+	config.learning_rate = 3.5e-3
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.initial_state = 'sconf_center_black_dot'
+
+	while True:
+		config.target_state = 'sconf_image("arch.png")'
+		build_and_train("companion_posterize", config)
+
+		config.target_state = 'sconf_imagestack("arch.png", "arch_posterize.png")'
+		build_and_train("companion_posterize", config)
 
 
 def main():
-	final_gradual_compare_large()
+	companion_training()
 
 if __name__ == "__main__":
 	main()
