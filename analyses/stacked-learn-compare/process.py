@@ -91,3 +91,22 @@ for img, sep_time in non_stacked_avgs.items():
 print("-" * 80)
 print("Correlation between separate time and average time in stacks:")
 print(stats.pearsonr(dist1, dist2))
+
+# print(stacked_avgs)
+# print(non_stacked_avgs)
+
+with open("isolated_averages.csv", 'w', newline='') as f:
+	f = csv.writer(f)
+	for img_name, iso_time in non_stacked_avgs.items():
+		f.writerow([img_name, iso_time])
+
+with open("companion_averages.csv", 'w', newline='') as f:
+	f = csv.writer(f)
+	# Header row:
+	f.writerow([""] + list(non_stacked_avgs.keys()))
+	# Rows:
+	for img1 in non_stacked_avgs.keys():
+		row = [img1]
+		for img2 in non_stacked_avgs.keys():
+			row.append(stacked_avgs[(img1, img2)])
+		f.writerow(row)
