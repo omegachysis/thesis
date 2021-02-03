@@ -163,23 +163,30 @@ def companion_training():
 	config = Config()
 	config.layer1_size = 256
 	config.num_channels = 15
-	config.target_channels = 6
-	config.size = 32
+	config.target_channels = 3
 	config.target_loss = 0.01
-	config.learning_rate = 3.5e-3
-	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	config.size = 32
 	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 
-	while True:
-		config.target_state = 'sconf_image("arch.png")'
-		build_and_train("companion_posterize", config)
+	imgs = list(glob.glob("images/hard/*.png"))
 
-		config.target_state = 'sconf_imagestack("arch.png", "arch_posterize.png")'
-		build_and_train("companion_posterize", config)
+	for path1 in imgs:
 
+		img1 = "hard/" + os.path.basename(path1)
+		config.target_channels = 3
+		config.target_state = f'sconf_image("{img1}")'
+		build_and_train('companion_1', config)
+
+		for path2 in imgs:
+			img2 = "hard/" + os.path.basename(path2)
+			config.target_channels = 6
+			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
+			build_and_train('companion_1', config)
 
 def main():
-	companion_training()
+	while True:
+		companion_training()
 
 if __name__ == "__main__":
 	main()
