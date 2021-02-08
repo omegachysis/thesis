@@ -21,8 +21,8 @@ def build_and_train(group: str, config: Config):
 	print("Target state:")
 	ca.display(xf)
 
-	print("Kernel set:")
-	print(ca.perception_kernel)
+	# print("Kernel set:")
+	# print(ca.perception_kernel)
 
 	window_size = 3
 	if config.growing_jump <= 0:
@@ -218,9 +218,25 @@ def kernel_set_compare():
 			config.kernel_set = kernel_set
 			build_and_train("compare_kernel_sets", config)
 
+def channel_count_compare():
+	config = Config()
+	config.layer1_size = 256
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.size = 30
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		for c in range(3, 21):
+			config.num_channels = c
+			build_and_train("compare_channel_count", config)
+
 def main():
 	while True:
-		kernel_set_compare()
+		channel_count_compare()
 
 if __name__ == "__main__":
 	main()
