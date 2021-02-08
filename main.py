@@ -164,25 +164,39 @@ def companion_training():
 	config.layer1_size = 256
 	config.num_channels = 15
 	config.target_channels = 3
-	config.target_loss = 0.01
-	config.size = 32
+	config.target_loss = 0.025
+	config.size = 60
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 
-	imgs = list(glob.glob("images/hard/*.png"))
+	config.target_channels = 3
+	config.target_state = f'sconf_image("hard/water.png")'
+	build_and_train('companion_2', config)
+	config.target_state = f'sconf_image("hard/arch.png")'
+	build_and_train('companion_2', config)
+	config.target_state = f'sconf_image("hard/pills.png")'
+	build_and_train('companion_2', config)
 
-	for path1 in imgs:
+	config.target_channels = 6
+	config.target_state = f'sconf_imagestack("hard/water.png", "hard/arch.png")'
+	build_and_train('companion_2', config)
+	config.target_state = f'sconf_imagestack("hard/water.png", "hard/pills.png")'
+	build_and_train('companion_2', config)
 
-		img1 = "hard/" + os.path.basename(path1)
-		config.target_channels = 3
-		config.target_state = f'sconf_image("{img1}")'
-		build_and_train('companion_1', config)
+	# imgs = list(glob.glob("images/hard/*.png"))
 
-		for path2 in imgs:
-			img2 = "hard/" + os.path.basename(path2)
-			config.target_channels = 6
-			config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
-			build_and_train('companion_1', config)
+	# for path1 in imgs:
+
+	# 	img1 = "hard/" + os.path.basename(path1)
+	# 	config.target_channels = 3
+	# 	config.target_state = f'sconf_image("{img1}")'
+	# 	build_and_train('companion_1', config)
+
+	# 	for path2 in imgs:
+	# 		img2 = "hard/" + os.path.basename(path2)
+	# 		config.target_channels = 6
+	# 		config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
+	# 		build_and_train('companion_1', config)
 
 def main():
 	while True:

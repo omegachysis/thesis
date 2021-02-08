@@ -30,4 +30,4 @@ print("Stats for gradual learning:")
 print(stats.describe(grad_times))
 
 print("T test:")
-print(stats.ttest_ind(non_grad_times, grad_times, equal_var=False, alternative="greater"))
+print(stats.ttest_ind(non_grad_times, grad_times, equal_var=False))
