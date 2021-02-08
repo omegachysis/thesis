@@ -11,7 +11,7 @@ def kernel_sobel():
 	identity = np.outer(identity, identity)
 	dx = np.outer(np.float32([1, 2, 1]), np.float32([-1, 0, 1])) / 8.0
 	dy = dx.T
-	return tf.stack([identity, dx - dy, dx + dy], axis=-1)
+	return tf.stack([identity, dx, dy], axis=-1)
 
 def kernel_neighbors():
 	basis = []
@@ -98,3 +98,4 @@ class Config(object):
 		self.lifetime = 64
 		self.target_loss = 0.01
 		self.growing_jump = 0
+		self.kernel_set = "kernel_sobel()"

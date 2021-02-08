@@ -10,7 +10,7 @@ from training import *
 def build_and_train(group: str, config: Config):
 	run = wandb.init(project="neural-cellular-automata", group=group, config=vars(config))
 
-	ca = CellularAutomata(config, kernel_sobel())
+	ca = CellularAutomata(config, eval(config.kernel_set))
 	training = Training(ca=ca, config=config)
 
 	x0 = eval(config.initial_state)(ca)
@@ -20,6 +20,9 @@ def build_and_train(group: str, config: Config):
 
 	print("Target state:")
 	ca.display(xf)
+
+	print("Kernel set:")
+	print(ca.perception_kernel)
 
 	window_size = 3
 	if config.growing_jump <= 0:
@@ -198,9 +201,26 @@ def companion_training():
 	# 		config.target_state = f'sconf_imagestack("{img1}", "{img2}")'
 	# 		build_and_train('companion_1', config)
 
+def kernel_set_compare():
+	config = Config()
+	config.layer1_size = 256
+	config.num_channels = 15
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.size = 30
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		for kernel_set in ["kernel_sobel()", "kernel_neighbors()"]:
+			config.kernel_set = kernel_set
+			build_and_train("compare_kernel_sets", config)
+
 def main():
 	while True:
-		companion_training()
+		kernel_set_compare()
 
 if __name__ == "__main__":
 	main()
