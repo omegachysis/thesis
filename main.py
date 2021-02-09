@@ -49,7 +49,8 @@ def build_and_train(group: str, config: Config):
 			rmse = tf.sqrt(tf.reduce_mean(tf.square(x - f)))
 			return rmse
 
-		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels)
+		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels,
+			max_seconds=1000)
 
 		if window_size >= config.size:
 			break
@@ -227,10 +228,10 @@ def channel_count_compare():
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 	
-	for path in glob.glob("images/final/*.png"):
+	for path in glob.glob("images/hard/*.png"):
 		img_name = os.path.basename(path)
-		config.target_state = f'sconf_image("final/{img_name}")'
-		for c in range(3, 21):
+		config.target_state = f'sconf_image("hard/{img_name}")'
+		for c in [3, 4, 5, 8, 12, 15, 18, 21, 27]:
 			config.num_channels = c
 			build_and_train("compare_channel_count", config)
 
