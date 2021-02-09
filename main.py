@@ -253,7 +253,7 @@ def size_compare():
 
 def main():
 	while True:
-		compare_size()
+		size_compare()
 
 if __name__ == "__main__":
 	main()
