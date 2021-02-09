@@ -235,9 +235,25 @@ def channel_count_compare():
 			config.num_channels = c
 			build_and_train("compare_channel_count", config)
 
+def size_compare():
+	config = Config()
+	config.layer1_size = 256
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.num_channels = 15
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	
+	for path in glob.glob("images/hard/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("hard/{img_name}")'
+		for s in [5,10,15,20,25,30,40,50,60]:
+			config.size = s
+			build_and_train("compare_size", config)
+
 def main():
 	while True:
-		channel_count_compare()
+		compare_size()
 
 if __name__ == "__main__":
 	main()
