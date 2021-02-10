@@ -50,7 +50,7 @@ def build_and_train(group: str, config: Config):
 			return rmse
 
 		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels,
-			max_seconds=1000)
+			max_seconds=10000)
 
 		if window_size >= config.size:
 			break
