@@ -50,7 +50,7 @@ def build_and_train(group: str, config: Config):
 			return rmse
 
 		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels,
-			max_seconds=10000)
+			max_seconds=1000)
 
 		if window_size >= config.size:
 			break
@@ -224,7 +224,7 @@ def channel_count_compare():
 	config.layer1_size = 256
 	config.target_channels = 3
 	config.target_loss = 0.01
-	config.size = 30
+	config.size = 20
 	config.initial_state = 'sconf_center_black_dot'
 	config.edge_strategy = 'EdgeStrategy.TF_SAME'
 	
@@ -233,7 +233,7 @@ def channel_count_compare():
 		config.target_state = f'sconf_image("hard/{img_name}")'
 		for c in [3, 4, 5, 8, 12, 15, 18, 21, 27]:
 			config.num_channels = c
-			build_and_train("compare_channel_count", config)
+			build_and_train("compare_channel_count_2", config)
 
 def size_compare():
 	config = Config()
@@ -253,7 +253,7 @@ def size_compare():
 
 def main():
 	while True:
-		size_compare()
+		channel_count_compare()
 
 if __name__ == "__main__":
 	main()
