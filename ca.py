@@ -42,11 +42,13 @@ class CellularAutomata(keras.Model):
 			])
 			self.use_perception_model = True
 
-		self.model = keras.Sequential([
-			keras.layers.Conv2D(self.hidden_layer_size, kernel_size=1, activation=tf.nn.relu),
-			keras.layers.Conv2D(self.num_channels, kernel_size=1, activation=None,
-				kernel_initializer=tf.zeros_initializer())
-		])
+		layers = []
+		for i in range(2 if config.two_layers else 1):
+			layers.append(keras.layers.Conv2D(
+				self.hidden_layer_size, kernel_size=1, activation=tf.nn.relu))
+		layers.append(keras.layers.Conv2D(self.num_channels, kernel_size=1, activation=None,
+				kernel_initializer=tf.zeros_initializer()))
+		self.model = keras.Sequential(layers)
 
 		# Compile the model:
 		self(tf.zeros([1, 3, 3, self.num_channels]))

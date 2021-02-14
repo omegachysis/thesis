@@ -251,9 +251,30 @@ def size_compare():
 			config.size = s
 			build_and_train("compare_size", config)
 
+def network_compare():
+	config = Config()
+	config.two_layers = False
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.num_channels = 15
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	
+	for path in glob.glob("images/hard/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("hard/{img_name}")'
+		for s in [5,10,20,30,40,50]:
+			config.size = s
+			for w in [32,64,128,256,512,1024]:
+				config.layer1_size = w
+				config.two_layers = False
+				build_and_train("network_compare", config)
+				config.two_layers = True
+				build_and_train("network_compare", config)
+
 def main():
 	while True:
-		channel_count_compare()
+		network_compare()
 
 if __name__ == "__main__":
 	main()
