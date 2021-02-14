@@ -14,12 +14,17 @@ class ProteinNetwork(object):
 		self.names = node_names
 
 		self.nn = tf.keras.models.Sequential([
-			# Input layer that takes in each protein:
-			tf.keras.layers.Input(shape=(len(node_names),)),
-			# Hidden layer that simulates interactions between proteins:
-			tf.keras.layers.Dense(256, activation="relu"),
-			# Output layer that produces change in each protein's activation amount:
-			tf.keras.layers.Dense(len(node_names), activation=None),
+			tf.keras.layers.Input(shape=(len(node_names)*3,1)),
+			tf.keras.layers.Conv1D(256, kernel_size=len(node_names),
+				activation="relu", padding="SAME"),
+			tf.keras.layers.Conv1D(1, kernel_size=1, activation=None,
+				kernel_initializer=tf.zeros_initializer())
+			# # Input layer that takes in each protein:
+			# tf.keras.layers.Input(shape=(len(node_names),)),
+			# # Hidden layer that simulates interactions between proteins:
+			# tf.keras.layers.Dense(256, activation="relu"),
+			# # Output layer that produces change in each protein's activation amount:
+			# tf.keras.layers.Dense(1, activation=None),
 		])
 		self.nn.build()
 		self.nn.summary()
@@ -39,7 +44,9 @@ class ProteinNetwork(object):
 
 	@tf.function
 	def tick_once(self, x):
-		return x + self.nn(x[None, ...])[0]
+		dx = self.nn(tf.reshape(tf.tile(x, [3]), [1,3*len(x),1]))
+		dx = tf.reshape(dx[0][len(x):2*len(x)], x.shape)
+		return x + dx
 
 	def run_for_ticks(self, s0, num_ticks):
 		s = s0
@@ -188,11 +195,14 @@ def main():
 	# <=> activates both ways
 	# x self-inhibits
 
-	print("SK x-> Ste9")
-	model.sample_an_interaction("SK", "Ste9", num_steps=5)
-	print("SK x-> Rum1")
-	model.sample_an_interaction("SK", "Rum1", num_steps=5)
-	print("Ste9 <-> Cdc2/Cdc13")
-	model.sample_an_interaction("Ste9", "Cdc2/Cdc13", num_steps=5)
-	print("Rum1 <-> Cdc2/Cdc13")
-	model.sample_an_interaction("Rum1", "Cdc2/Cdc13", num_steps=5)
+	# print("SK x-> Ste9")
+	# model.sample_an_interaction("SK", "Ste9", num_steps=5)
+	# print("SK x-> Rum1")
+	# model.sample_an_interaction("SK", "Rum1", num_steps=5)
+	# print("Ste9 <-> Cdc2/Cdc13")
+	# model.sample_an_interaction("Ste9", "Cdc2/Cdc13", num_steps=5)
+	# print("Rum1 <-> Cdc2/Cdc13")
+	# model.sample_an_interaction("Rum1", "Cdc2/Cdc13", num_steps=5)
+
+if __name__ == "__main__":
+	main()
