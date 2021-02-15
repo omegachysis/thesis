@@ -71,7 +71,7 @@ class ProteinNetwork(object):
 	def to_dataframe(self, s):
 		rows = []
 		for i, value in enumerate(s):
-			rows.append([self.names[i], round(float(value), 3)])
+			rows.append([self.names[i], round(float(value[0]), 3)])
 		df = pd.DataFrame(rows, columns=["protein", "activation"])
 		return df
 
@@ -83,7 +83,7 @@ class ProteinNetwork(object):
 		s0 = tf.reshape(
 			tf.stack([s0 for _ in range(self.num_channels)]),
 			[len(self.names), self.num_channels])
-		s = tf.constant(s0)
+		s = s0
 		for num_ticks in time_segments:
 			s = self.run_for_ticks(s, num_ticks)
 			res.append(s)
@@ -107,13 +107,14 @@ class TrainingModel(object):
 
 	def display(self):
 		snapshots = self.network.run_snapshots(self.targets[0], self.time_segments)
-		self.network.to_dataframe(self.targets[0])
-		for snapshot in snapshots:
+		# self.network.to_dataframe(self.targets[0])
+		for i, snapshot in enumerate(snapshots):
+			print("Snapshot", i)
 			display(self.network.to_dataframe(snapshot))
 
 	def train(self, end_idx: int) -> float:
 		loss = self.network.train(self.targets[0], self.targets[1 : end_idx+1],
-			self.time_segments[1 : end_idx+1])
+			self.time_segments[0 : end_idx])
 		return loss
 	
 	def sample_an_interaction(self, protein1: str, protein2: str, num_steps: int):
@@ -144,7 +145,7 @@ def main():
 
 	network = ProteinNetwork([
 		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"],
-		num_channels=1)
+		num_channels=5)
 	targets = [
 		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
 		[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
@@ -158,13 +159,12 @@ def main():
 	]
 	
 	time_segments = [
-		5, # G1
 		5, # S
+		5, # G2
 		7, # G2
 		7, # G2
 		7, # G2
-		7, # G2
-		3, # M
+		7, # M
 		3, # M
 		3, # G1
 	]
@@ -174,7 +174,7 @@ def main():
 	start = time.time()
 	for i in range(len(time_segments)):
 		print("Doing", i+1, "segment(s)")
-		target_loss = 0.01
+		target_loss = 0.001
 		loss = 9999.9
 		while loss > target_loss:
 			# Graduated segments:
