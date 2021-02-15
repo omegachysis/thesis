@@ -138,7 +138,7 @@ class TrainingModel(object):
 		display(df)
 
 def run_experiment(config):
-	wandb.init(project="neural-cellular-automata", group="final_yeast_abm", config=config)
+	run = wandb.init(project="neural-cellular-automata", group="final_yeast_abm", config=config)
 
 	network = ProteinNetwork([
 		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"],
@@ -192,6 +192,7 @@ def run_experiment(config):
 	wandb.run.summary["total_seconds"] = t
 
 	model.display()
+	run.finish()
 
 	# LEGEND:
 	# -> inhibits
