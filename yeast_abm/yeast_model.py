@@ -137,13 +137,8 @@ class TrainingModel(object):
 			protein1 + " (t+1)", protein2 + " (t+1)"])
 		display(df)
 
-def main():
-	config = dict(
-		gradual=True,
-		num_channels=1,
-		target_loss=0.001,
-	)
-	# wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
+def run_experiment(config):
+	wandb.init(project="neural-cellular-automata", group="final_yeast_abm", config=config)
 
 	network = ProteinNetwork([
 		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"],
@@ -182,21 +177,19 @@ def main():
 			loss = 9999.9
 			while loss > target_loss:
 				# Graduated segments:
-				for _ in range(20):
-					loss = model.train(i+1)
-					# wandb.log({"loss": loss})
-				print("Loss=", loss.numpy())
+				loss = model.train(i+1)
+				wandb.log({"loss": loss})
 
 	else:
 		print("Doing", len(time_segments), "segments")
 		loss = 9999.9
 		while loss > target_loss:
-			for _ in range(20):
-				loss = model.train(len(time_segments))
-			print("Loss=", loss.numpy())
+			loss = model.train(len(time_segments))
+			wandb.log({"loss": loss})
 
 	t = time.time() - start
 	print(t, "seconds to train")
+	wandb.run.summary["total_seconds"] = t
 
 	model.display()
 
@@ -215,6 +208,19 @@ def main():
 	# model.sample_an_interaction("Ste9", "Cdc2/Cdc13", num_steps=5)
 	# print("Rum1 <-> Cdc2/Cdc13")
 	# model.sample_an_interaction("Rum1", "Cdc2/Cdc13", num_steps=5)
+
+def main():
+	config = dict(
+		gradual=False,
+		num_channels=2,
+		target_loss=0.001,
+	)
+
+	while True:
+		config['gradual'] = False
+		run_experiment(config)
+		config['gradual'] = True
+		run_experiment(config)
 
 if __name__ == "__main__":
 	main()
