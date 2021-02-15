@@ -10,14 +10,15 @@ class ProteinNetwork(object):
 	structure where each graph node is a protein 
 	and the edges represent interactions between proteins. """
 
-	def __init__(self, node_names: List[str]):
+	def __init__(self, node_names: List[str], num_channels: int):
 		self.names = node_names
+		self.num_channels = num_channels
 
 		self.nn = tf.keras.models.Sequential([
-			tf.keras.layers.Input(shape=(len(node_names)*3,1)),
+			tf.keras.layers.Input(shape=(len(node_names)*3,num_channels)),
 			tf.keras.layers.Conv1D(256, kernel_size=len(node_names),
 				activation="relu", padding="SAME"),
-			tf.keras.layers.Conv1D(1, kernel_size=1, activation=None,
+			tf.keras.layers.Conv1D(num_channels, kernel_size=1, activation=None,
 				kernel_initializer=tf.zeros_initializer())
 			# # Input layer that takes in each protein:
 			# tf.keras.layers.Input(shape=(len(node_names),)),
@@ -44,8 +45,8 @@ class ProteinNetwork(object):
 
 	@tf.function
 	def tick_once(self, x):
-		dx = self.nn(tf.reshape(tf.tile(x, [3]), [1,3*len(x),1]))
-		dx = tf.reshape(dx[0][len(x):2*len(x)], x.shape)
+		dx = self.nn(tf.reshape(tf.tile(x, [3,1]), [1,3*len(self.names),self.num_channels]))
+		dx = tf.reshape(dx[0][len(self.names):2*len(self.names)], x.shape)
 		return x + dx
 
 	def run_for_ticks(self, s0, num_ticks):
@@ -58,7 +59,7 @@ class ProteinNetwork(object):
 	def loss(s, target):
 		""" Calculate the mean squared error that will be used 
 		as the training loss. """
-		return tf.reduce_mean(tf.square(s - target))
+		return tf.reduce_mean(tf.square(s[:, 0] - target))
 
 	@staticmethod
 	def loss_snapshots(s_snapshots, target_snapshots):
@@ -79,6 +80,9 @@ class ProteinNetwork(object):
 		the model for each of those segments, producing the output
 		at each snapshot of time at the end of each segment. """
 		res = []
+		s0 = tf.reshape(
+			tf.stack([s0 for _ in range(self.num_channels)]),
+			[len(self.names), self.num_channels])
 		s = tf.constant(s0)
 		for num_ticks in time_segments:
 			s = self.run_for_ticks(s, num_ticks)
@@ -88,7 +92,6 @@ class ProteinNetwork(object):
 	def train(self, s0, targets=[], time_segments=[]):
 		""" Return the loss from this training step. """
 		assert len(targets) == len(time_segments)
-		s0 = tf.constant(s0)
 		with tf.GradientTape() as tape:
 			snapshots = self.run_snapshots(s0, time_segments)
 			loss = self.loss_snapshots(snapshots, targets)
@@ -108,9 +111,9 @@ class TrainingModel(object):
 		for snapshot in snapshots:
 			display(self.network.to_dataframe(snapshot))
 
-	def train(self, start_idx: int, end_idx: int) -> float:
-		loss = self.network.train(self.targets[0], self.targets[start_idx+1 : end_idx+1],
-			self.time_segments[start_idx+1 : end_idx+1])
+	def train(self, end_idx: int) -> float:
+		loss = self.network.train(self.targets[0], self.targets[1 : end_idx+1],
+			self.time_segments[1 : end_idx+1])
 		return loss
 	
 	def sample_an_interaction(self, protein1: str, protein2: str, num_steps: int):
@@ -137,10 +140,11 @@ def main():
 	config = dict(
 		num_stages=9, num_trials=1, train_type="Graduated Segments"
 	)
-	wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
+	# wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
 
 	network = ProteinNetwork([
-		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
+		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"],
+		num_channels=1)
 	targets = [
 		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
 		[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
@@ -173,14 +177,10 @@ def main():
 		target_loss = 0.01
 		loss = 9999.9
 		while loss > target_loss:
-			# Isolated segment:
-			# for _ in range(10):
-			# 	model.train(i, i+1)
-
 			# Graduated segments:
-			for _ in range(50):
-				loss = model.train(0, i+1)
-				wandb.log({"loss": loss})
+			for _ in range(20):
+				loss = model.train(i+1)
+				# wandb.log({"loss": loss})
 			print("Loss=", loss.numpy())
 
 	t = time.time() - start
