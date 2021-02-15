@@ -170,7 +170,7 @@ def main():
 	start = time.time()
 	for i in range(len(time_segments)):
 		print("Doing", i+1, "segment(s)")
-		target_loss = 0.001
+		target_loss = 0.01
 		loss = 9999.9
 		while loss > target_loss:
 			# Isolated segment:
