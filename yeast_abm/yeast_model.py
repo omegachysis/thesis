@@ -139,13 +139,15 @@ class TrainingModel(object):
 
 def main():
 	config = dict(
-		num_stages=9, num_trials=1, train_type="Graduated Segments"
+		gradual=True,
+		num_channels=1,
+		target_loss=0.001,
 	)
 	# wandb.init(project="neural-cellular-automata", group="yeast_model_2", config=config)
 
 	network = ProteinNetwork([
 		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"],
-		num_channels=5)
+		num_channels=config["num_channels"])
 	targets = [
 		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
 		[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
@@ -172,19 +174,29 @@ def main():
 	model = TrainingModel(time_segments, targets, network)
 
 	start = time.time()
-	for i in range(len(time_segments)):
-		print("Doing", i+1, "segment(s)")
-		target_loss = 0.001
+
+	target_loss = config['target_loss']
+	if config['gradual']:
+		for i in range(len(time_segments)):
+			print("Doing", i+1, "segment(s)")
+			loss = 9999.9
+			while loss > target_loss:
+				# Graduated segments:
+				for _ in range(20):
+					loss = model.train(i+1)
+					# wandb.log({"loss": loss})
+				print("Loss=", loss.numpy())
+
+	else:
+		print("Doing", len(time_segments), "segments")
 		loss = 9999.9
 		while loss > target_loss:
-			# Graduated segments:
 			for _ in range(20):
-				loss = model.train(i+1)
-				# wandb.log({"loss": loss})
+				loss = model.train(len(time_segments))
 			print("Loss=", loss.numpy())
 
 	t = time.time() - start
-	print(t, "seconds to train graduated segments")
+	print(t, "seconds to train")
 
 	model.display()
 
