@@ -218,10 +218,12 @@ def main():
 	)
 
 	while True:
-		config['gradual'] = False
-		run_experiment(config)
-		config['gradual'] = True
-		run_experiment(config)
+		for n in [2,3,4,5,6,7]:
+			config['num_channels'] = n
+			config['gradual'] = False
+			run_experiment(config)
+			config['gradual'] = True
+			run_experiment(config)
 
 if __name__ == "__main__":
 	main()
