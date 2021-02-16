@@ -167,25 +167,34 @@ def run_experiment(config):
 	]
 
 	model = TrainingModel(time_segments, targets, network)
+	timeout = 1000
 
 	start = time.time()
 
-	target_loss = config['target_loss']
-	if config['gradual']:
-		for i in range(len(time_segments)):
-			print("Doing", i+1, "segment(s)")
+	def do_training():
+		target_loss = config['target_loss']
+		if config['gradual']:
+			for i in range(len(time_segments)):
+				print("Doing", i+1, "segment(s)")
+				loss = 9999.9
+				while loss > target_loss:
+					if time.time() - start > timeout:
+						print("Stopping due to time out")
+						return
+					# Graduated segments:
+					loss = model.train(i+1)
+					wandb.log({"loss": loss})
+
+		else:
+			print("Doing", len(time_segments), "segments")
 			loss = 9999.9
 			while loss > target_loss:
-				# Graduated segments:
-				loss = model.train(i+1)
+				if time.time() - start > timeout:
+					print("Stopping due to time out")
+					return
+				loss = model.train(len(time_segments))
 				wandb.log({"loss": loss})
-
-	else:
-		print("Doing", len(time_segments), "segments")
-		loss = 9999.9
-		while loss > target_loss:
-			loss = model.train(len(time_segments))
-			wandb.log({"loss": loss})
+	do_training()
 
 	t = time.time() - start
 	print(t, "seconds to train")
