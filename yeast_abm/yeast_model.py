@@ -10,22 +10,21 @@ class ProteinNetwork(object):
 	structure where each graph node is a protein 
 	and the edges represent interactions between proteins. """
 
-	def __init__(self, node_names: List[str], num_channels: int):
+	def __init__(self, node_names: List[str]):
 		self.names = node_names
-		self.num_channels = num_channels
 
 		self.nn = tf.keras.models.Sequential([
-			tf.keras.layers.Input(shape=(len(node_names)*3,num_channels)),
-			tf.keras.layers.Conv1D(256, kernel_size=len(node_names),
-				activation="relu", padding="SAME"),
-			tf.keras.layers.Conv1D(num_channels, kernel_size=1, activation=None,
-				kernel_initializer=tf.zeros_initializer())
-			# # Input layer that takes in each protein:
-			# tf.keras.layers.Input(shape=(len(node_names),)),
-			# # Hidden layer that simulates interactions between proteins:
-			# tf.keras.layers.Dense(256, activation="relu"),
-			# # Output layer that produces change in each protein's activation amount:
-			# tf.keras.layers.Dense(1, activation=None),
+			# tf.keras.layers.Input(shape=(len(node_names)*3,num_channels)),
+			# tf.keras.layers.Conv1D(256, kernel_size=len(node_names),
+			# 	activation="relu", padding="SAME"),
+			# tf.keras.layers.Conv1D(num_channels, kernel_size=1, activation=None,
+			# 	kernel_initializer=tf.zeros_initializer())
+			# Input layer that takes in each protein:
+			tf.keras.layers.Input(shape=(len(node_names),)),
+			# Hidden layer that simulates interactions between proteins:
+			tf.keras.layers.Dense(256, activation="relu"),
+			# Output layer that produces change in each protein's activation amount:
+			tf.keras.layers.Dense(len(node_names), activation=None),
 		])
 		self.nn.build()
 		self.nn.summary()
@@ -45,12 +44,11 @@ class ProteinNetwork(object):
 
 	@tf.function
 	def tick_once(self, x):
-		dx = self.nn(tf.reshape(tf.tile(x, [3,1]), [1,3*len(self.names),self.num_channels]))
-		dx = tf.reshape(dx[0][len(self.names):2*len(self.names)], x.shape)
-		return x + dx
+		dx = self.nn(x[None, ...])
+		return x + dx[0]
 
 	def run_for_ticks(self, s0, num_ticks):
-		s = s0
+		s = tf.constant(s0)
 		for _ in range(num_ticks):
 			s = self.tick_once(s)
 		return s
@@ -59,7 +57,7 @@ class ProteinNetwork(object):
 	def loss(s, target):
 		""" Calculate the mean squared error that will be used 
 		as the training loss. """
-		return tf.reduce_mean(tf.square(s[:, 0] - target))
+		return tf.reduce_mean(tf.square(s - target))
 
 	@staticmethod
 	def loss_snapshots(s_snapshots, target_snapshots):
@@ -80,9 +78,6 @@ class ProteinNetwork(object):
 		the model for each of those segments, producing the output
 		at each snapshot of time at the end of each segment. """
 		res = []
-		s0 = tf.reshape(
-			tf.stack([s0 for _ in range(self.num_channels)]),
-			[len(self.names), self.num_channels])
 		s = s0
 		for num_ticks in time_segments:
 			s = self.run_for_ticks(s, num_ticks)
@@ -141,8 +136,7 @@ def run_experiment(config):
 	run = wandb.init(project="neural-cellular-automata", group="final_yeast_abm", config=config)
 
 	network = ProteinNetwork([
-		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"],
-		num_channels=config["num_channels"])
+		"SK", "Cdc2/Cdc13", "Ste9", "Rum1", "Slp1", "Cdc2/Cdc13*", "Wee1Mik1", "Cdc25", "PP"])
 	targets = [
 		[1., 0.,    1., 1., 0., 0.,   1.,    0., 0.], # G1
 		[0., 0.,    0., 0., 0., 0.,   1.,    0., 0.], # S
@@ -222,17 +216,14 @@ def run_experiment(config):
 def main():
 	config = dict(
 		gradual=False,
-		num_channels=2,
 		target_loss=0.001,
 	)
 
 	while True:
-		for n in [2,3,4,5,6,7]:
-			config['num_channels'] = n
-			config['gradual'] = False
-			run_experiment(config)
-			config['gradual'] = True
-			run_experiment(config)
+		config['gradual'] = False
+		run_experiment(config)
+		config['gradual'] = True
+		run_experiment(config)
 
 if __name__ == "__main__":
 	main()
