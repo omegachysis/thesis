@@ -96,7 +96,8 @@ class Config(object):
 		self.edge_strategy = 'EdgeStrategy.ZEROS'
 		self.initial_state = 'sconf_center_black_dot'
 		self.target_state = 'sconf_image("lenna.png")'
-		self.lifetime = 64
+		# self.lifetime = 64
 		self.target_loss = 0.01
 		self.growing_jump = 0
 		self.kernel_set = "kernel_sobel()"
+		self.laplace_loss = False

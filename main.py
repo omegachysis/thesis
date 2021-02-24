@@ -35,19 +35,21 @@ def build_and_train(group: str, config: Config):
 		lifetime = window_size + 10
 		print("Lifetime: ", lifetime)
 
-		a = config.size // 2 - window_size // 2
-		b = config.size // 2 + window_size // 2
-		a = max(0, a)
-		b = min(config.size - 1, b)
+		def rmse_loss(x, channel):
+			x = x[:, :, :, channel:channel+1]
+			f = xf[None, :, :, channel:channel+1]
+			return tf.sqrt(tf.reduce_mean(tf.square(x - f)))
 
-		def loss_fn(x, channel):
-			x = x[:, a:b, a:b, channel:channel+1]
-			f = xf[None, a:b, a:b, channel:channel+1]
+		def rmse_laplace_loss(x, channel):
+			x = x[:, :, :, channel:channel+1]
+			f = xf[None, :, :, channel:channel+1]
+			rmse = tf.sqrt(tf.reduce_mean(tf.square(x - f)))
 			lx = CellularAutomata.laplacian(x)
 			lf = CellularAutomata.laplacian(f)
-			# laplace_err = tf.reduce_mean(tf.square(lx - lf))
-			rmse = tf.sqrt(tf.reduce_mean(tf.square(x - f)))
-			return rmse
+			laplace_err = tf.reduce_mean(tf.square(lx - lf))
+			return rmse + laplace_err
+
+		loss_fn = rmse_laplace_loss if config.laplace_loss else rmse_loss
 
 		training.run(x0_fn, xf_fn, lifetime, loss_fn, config.target_channels,
 			max_seconds=1000)
@@ -272,9 +274,78 @@ def network_compare():
 				config.two_layers = True
 				build_and_train("network_compare", config)
 
+def lr_compare():
+	config = Config()
+	config.two_layers = False
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.num_channels = 15
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	
+	for path in glob.glob("images/hard/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("hard/{img_name}")'
+		for l in [1.0e-3, 2.0e-3, 3.5e-3, 4.0e-3, 5.0e-3]:
+			config.learning_rate = l
+			build_and_train("lr_compare_2", config)
+
+def edge_strategies():
+	config = Config()
+	config.two_layers = False
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.num_channels = 15
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
+	
+	for path in glob.glob("images/hard/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("hard/{img_name}")'
+		for e in ["EdgeStrategy.TF_SAME", "EdgeStrategy.ZEROS", "EdgeStrategy.ONES", 
+		"EdgeStrategy.TORUS", "EdgeStrategy.MIRROR", "EdgeStrategy.RANDOM"]:
+			config.edge_strategy = e
+			build_and_train("edge_strategies_2", config)
+
+def loss_functions():
+	config = Config()
+	config.two_layers = False
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.num_channels = 15
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.TF_SAME'
+	
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		config.laplace_loss = False
+		build_and_train("final_loss_functions", config)
+		config.laplace_loss = True
+		build_and_train("final_loss_functions", config)
+
+def initial_states():
+	config = Config()
+	config.two_layers = False
+	config.target_channels = 3
+	config.target_loss = 0.01
+	config.num_channels = 15
+	config.size = 32
+	config.initial_state = 'sconf_center_black_dot'
+	config.edge_strategy = 'EdgeStrategy.MIRROR'
+	
+	for path in glob.glob("images/final/*.png"):
+		img_name = os.path.basename(path)
+		config.target_state = f'sconf_image("final/{img_name}")'
+		for path2 in glob.glob("images/initials/*.png"):
+			img_name2 = os.path.basename(path2)
+			config.initial_state = f'sconf_image("initials/{img_name2}")'
+			build_and_train("final_initial_states", config)
+
 def main():
 	while True:
-		network_compare()
+		initial_states()
 
 if __name__ == "__main__":
 	main()

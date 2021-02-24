@@ -16,11 +16,10 @@ class EdgeStrategy:
 	RANDOM = 3
 
 class CellularAutomata(keras.Model):
-	def __init__(self, config, perception_kernel, img_size=None):
+	def __init__(self, config, perception_kernel):
 		super().__init__()
 
-		if img_size is None: img_size = config.size
-		self.img_size = img_size
+		self.img_size = config.size
 		self.num_channels = config.num_channels
 		self.edge_strategy = eval(config.edge_strategy)
 		self.hidden_layer_size = config.layer1_size
@@ -79,6 +78,7 @@ class CellularAutomata(keras.Model):
 	@tf.function
 	def perceive(self, x):
 		pad_mode = None
+		w = x.shape[1]
 
 		if self.edge_strategy == EdgeStrategy.TF_SAME:
 			pad_mode = "SAME"
@@ -89,7 +89,6 @@ class CellularAutomata(keras.Model):
 			# to make sure that the world's behavior is isotropic.
 			multiples = [1, 3, 3, 1]
 			t1 = tf.tile(x, multiples)
-			w = self.img_size
 			x = t1[:, w-1 : w-1+w+2, w-1 : w-1+w+2, :]
 
 		elif str(self.edge_strategy).startswith('pad_const '):
@@ -112,7 +111,7 @@ class CellularAutomata(keras.Model):
 			pad_mode = "VALID"
 			paddings = tf.constant([[0,0], [1,1], [1,1], [0,0]])
 			x = tf.pad(x, paddings, "CONSTANT")
-			mask = tf.constant(0.0, shape=(1, self.img_size, self.img_size, self.num_channels))
+			mask = tf.constant(0.0, shape=(1, w, w, self.num_channels))
 			mask = tf.pad(mask, paddings, "CONSTANT", constant_values=1.0)
 			noise = tf.cast(tf.random.uniform(tf.shape(mask[...])), tf.float32)
 			x += mask * noise
